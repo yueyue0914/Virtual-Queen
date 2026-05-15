@@ -1,0 +1,15 @@
+# Gradle 发行版与压缩包（禁止提交，体积超限且应由 wrapper 下载）
+gradle-*-all.zip
+gradle-*-bin.zip
+**/gradle-*-all/
+
+# 本地解压的 Gradle 完整发行目录（若曾解压到项目内）
+dianziQueen/gradle-8.2.1-all/
+
+# Android / IDE
+.gradle/
+**/build/
+local.properties
+.idea/
+*.iml
+.DS_Store

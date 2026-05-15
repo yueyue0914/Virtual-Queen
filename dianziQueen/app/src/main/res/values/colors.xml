@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="pure_black">#000000</color>
+    <color name="blood_red">#FF1744</color>
+    <color name="blood_red_dark">#B71C1C</color>
+    <color name="crimson_glow">#FF5252</color>
+    <color name="red_hint">#66FF1744</color>
+    <color name="frame_red">#99E53935</color>
+    <color name="input_fill">#1A0D0D</color>
+    <color name="text_red_primary">#FF6E6E</color>
+    <color name="text_red_dim">#CC5555</color>
+    <color name="text_red_muted">#99AA4444</color>
+    <color name="submit_text_black">#000000</color>
+    <!-- 未激活：终端绿 -->
+    <color name="matrix_green">#00E676</color>
+    <color name="matrix_green_bright">#69F0AE</color>
+    <color name="matrix_green_dim">#A5D6A7</color>
+    <color name="matrix_green_muted">#6680CBC4</color>
+    <color name="matrix_green_glow">#00FF94</color>
+    <color name="frame_green">#9900E676</color>
+    <color name="input_stroke_green">#6600E676</color>
+    <color name="input_fill_green">#0D1A14</color>
+    <color name="banner_stroke_green">#8800E676</color>
+    <color name="banner_fill_green">#22000000</color>
+    <!-- 兼容旧引用 -->
+    <color name="queen_bg">#000000</color>
+    <color name="queen_primary">#FF1744</color>
+    <color name="queen_secondary">#FF5252</color>
+    <color name="queen_surface">#1A0D0D</color>
+    <color name="queen_on_surface">#FFCDD2</color>
+    <color name="queen_error">#FF1744</color>
+</resources>

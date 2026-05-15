@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">电子Queen</string>
+    <string name="queen_service_channel">Queen 常驻服务</string>
+    <string name="queen_teasing_channel">Queen 提示</string>
+    <string name="fg_notification_title">DIANZI QUEEN // ACTIVE</string>
+    <string name="fg_notification_text">电子Queen 正在运行（用户已激活）。</string>
+
+    <string name="lock_title">电子QUEEN</string>
+    <string name="lock_subtitle">By 月月</string>
+    <string name="lock_system_not_locked">[ SYSTEM NOT LOCKED ]</string>
+    <string name="lock_system_locked">[ SYSTEM LOCKED ]</string>
+    <string name="lock_system_online">[ SYSTEM ONLINE ]</string>
+    <string name="lock_access_label">&gt; ENTER ACCESS CODE</string>
+    <string name="hint_password">输入访问口令</string>
+    <string name="btn_submit">上交权限</string>
+    <string name="btn_fix_permissions">去开启下一项</string>
+    <string name="btn_support">懒得弄口令？那就去付钱。</string>
+    <string name="wrong_password">ACCESS DENIED</string>
+    <string name="status_need_permissions">仍有系统项未就绪</string>
+    <string name="status_activated">SYSTEM LOCKED · 服务已启动</string>
+    <string name="permission_banner_title">以下权限未就绪（每次进入都会检查）：</string>
+    <string name="permission_banner_title_mixed">以下权限未就绪；通知可能被拦截（每次进入都会检查）：</string>
+    <string name="notification_banner_title">通知可能被拦截（悬浮横幅需在系统里设为「重要」；应用无法代你强制修改）：</string>
+    <string name="perm_post_notifications">· 通知权限未授予（Android 13+）</string>
+    <string name="perm_notifications_off">· 本应用通知已在系统里关闭</string>
+    <string name="perm_channel_not_high">·「Queen 提示」通知级别过低（请改为「优先 / 重要」）</string>
+    <string name="perm_battery">· 应用始终在后台运行（关闭电池优化）</string>
+    <string name="perm_overlay">· 允许显示在其他应用的上层</string>
+    <string name="perm_storage">· 允许访问照片、媒体与文件</string>
+    <string name="toast_all_privileges_ready">当前检查项均已就绪</string>
+    <string name="toast_need_write_settings_before_takeover">请先开启「修改系统设置」权限，打开后再返回本应用，接管动画才会开始。</string>
+    <string name="support_url" translatable="false">https://afdian.com/a/bblbb</string>
+</resources>
