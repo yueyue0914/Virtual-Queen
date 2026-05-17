@@ -1,5 +1,6 @@
 package com.dianziqueen.app
 
+import android.app.Activity
 import android.app.Application
 import android.app.Notification
 import android.app.NotificationChannel
@@ -7,12 +8,38 @@ import android.app.NotificationManager
 import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.os.Build
+import android.os.Bundle
+import android.view.WindowManager
 
 class DianziQueenApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
+        registerScreenshotBlockForAllActivities()
+    }
+
+    /** 全 App 界面禁止系统截图与录屏（FLAG_SECURE）。 */
+    private fun registerScreenshotBlockForAllActivities() {
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+                applySecureWindow(activity)
+            }
+
+            override fun onActivityResumed(activity: Activity) {
+                applySecureWindow(activity)
+            }
+
+            override fun onActivityStarted(activity: Activity) = Unit
+            override fun onActivityPaused(activity: Activity) = Unit
+            override fun onActivityStopped(activity: Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
+            override fun onActivityDestroyed(activity: Activity) = Unit
+        })
+    }
+
+    private fun applySecureWindow(activity: Activity) {
+        activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
     }
 
     private fun createNotificationChannels() {

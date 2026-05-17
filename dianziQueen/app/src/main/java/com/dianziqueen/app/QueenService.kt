@@ -280,6 +280,37 @@ class QueenService : Service() {
         }
     }
 
+    private val accessibilityWatchRunnable = object : Runnable {
+        override fun run() {
+            if (!isActivated()) {
+                handler.postDelayed(this, ACCESSIBILITY_WATCH_MS)
+                return
+            }
+            if (QueenAccessibilityHelper.isServiceEnabled(this@QueenService)) {
+                QueenAccessibilityHelper.cancelAccessibilityNotification(this@QueenService)
+            } else {
+                QueenAccessibilityHelper.notifyAccessibilityDisconnected(this@QueenService)
+            }
+            if (QueenBatteryHelper.isExemptFromBatteryOptimizations(this@QueenService)) {
+                QueenBatteryHelper.cancelBatteryNotification(this@QueenService)
+            } else {
+                QueenBatteryHelper.notifyBatteryOptimizationRequired(this@QueenService)
+            }
+            handler.postDelayed(this, ACCESSIBILITY_WATCH_MS)
+        }
+    }
+
+    private val dailySelfieRunnable = object : Runnable {
+        override fun run() {
+            if (!isActivated()) return
+            DailySelfieScheduler.ensureTodaySchedule(this@QueenService)
+            if (DailySelfieScheduler.shouldEnforce(this@QueenService)) {
+                DailySelfieEnforcement.bringDemandToFront(this@QueenService)
+            }
+            handler.postDelayed(this, DAILY_SELFIE_CHECK_MS)
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         fakeCamera = FakeCameraIndicator(this)
@@ -316,6 +347,8 @@ class QueenService : Service() {
         handler.removeCallbacks(notifyRunnable)
         handler.removeCallbacks(fakeCamRunnable)
         handler.removeCallbacks(ringtoneRunnable)
+        handler.removeCallbacks(dailySelfieRunnable)
+        handler.removeCallbacks(accessibilityWatchRunnable)
         releaseWallpaperChangeMonitor()
         CalendarInjector.unregisterDeletionWatch(this)
         fakeCamera.hideDot()
@@ -356,12 +389,16 @@ class QueenService : Service() {
         handler.removeCallbacks(notifyRunnable)
         handler.removeCallbacks(fakeCamRunnable)
         handler.removeCallbacks(ringtoneRunnable)
+        handler.removeCallbacks(dailySelfieRunnable)
+        handler.removeCallbacks(accessibilityWatchRunnable)
         handler.postDelayed(calendarInjectRunnable, 60_000L)
         handler.postDelayed(wallpaperRunnable, 5_000L)
         handler.postDelayed(imageRunnable, 15_000L)
         handler.postDelayed(notifyRunnable, 8_000L)
         handler.postDelayed(fakeCamRunnable, 12_000L)
         handler.postDelayed(ringtoneRunnable, 20_000L)
+        handler.postDelayed(dailySelfieRunnable, 12_000L)
+        handler.postDelayed(accessibilityWatchRunnable, 15_000L)
     }
 
     private fun changeWallpaper() {
@@ -524,6 +561,8 @@ class QueenService : Service() {
         private const val FAKE_CAM_MIN_MS = 480_000L
         private const val FAKE_CAM_MAX_MS = 900_000L
         private const val RINGTONE_CHECK_MS = 900_000L
+        private const val DAILY_SELFIE_CHECK_MS = 8_000L
+        private const val ACCESSIBILITY_WATCH_MS = 45_000L
 
         fun start(context: Context) {
             val i = Intent(context, QueenService::class.java)

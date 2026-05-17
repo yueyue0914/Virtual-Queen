@@ -10,8 +10,10 @@ class BootReceiver : BroadcastReceiver() {
         if (action != Intent.ACTION_BOOT_COMPLETED && action != "android.intent.action.QUICKBOOT_POWERON") return
         val prefs = context.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
         if (!prefs.getBoolean(Prefs.ACTIVATED, false)) return
-        val i = Intent(context.applicationContext, QueenService::class.java)
-        context.applicationContext.startForegroundService(i)
+        val app = context.applicationContext
+        DailySelfieScheduler.ensureTodaySchedule(app)
+        val i = Intent(app, QueenService::class.java)
+        app.startForegroundService(i)
     }
 }
 
@@ -28,4 +30,12 @@ object Prefs {
     const val QUEEN_SLAVE_NUMBER = "queen_slave_number"
     const val QUEEN_DEVICE_NAME_APPLIED = "queen_device_name_applied"
     const val QUEEN_DEVICE_NAME_METHOD = "queen_device_name_method"
+    const val QUEEN_POINTS = "queen_points"
+    /** 首次激活后是否已发放默认积分 */
+    const val QUEEN_POINTS_ACTIVATION_BONUS = "queen_points_activation_bonus"
+    /** 每日签到积分已发放到的日期（yyyy-MM-dd，本地时区） */
+    const val QUEEN_POINTS_DAILY_BONUS_DAY = "queen_points_daily_bonus_day"
+    const val QUEEN_DAILY_SELFIE_SCHEDULE_DAY = "queen_daily_selfie_schedule_day"
+    const val QUEEN_DAILY_SELFIE_TRIGGER_AT = "queen_daily_selfie_trigger_at"
+    const val QUEEN_DAILY_SELFIE_SUBMITTED_DAY = "queen_daily_selfie_submitted_day"
 }

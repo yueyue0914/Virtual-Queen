@@ -22,8 +22,14 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.google.android.material.bottomnavigation.BottomNavigationView
 
 class MainActivity : AppCompatActivity() {
+
+    companion object {
+        const val EXTRA_OPEN_ACCESSIBILITY = "open_accessibility"
+        const val EXTRA_OPEN_BATTERY_SETTINGS = "open_battery_settings"
+    }
 
     /** 激活口令，支持中文。 */
     private val correctPassword = "我是电子女王的贱奴"
@@ -133,6 +139,27 @@ class MainActivity : AppCompatActivity() {
     private lateinit var teasingLine1: TextView
     private lateinit var teasingLine2: TextView
     private lateinit var codeRain: CodeRainView
+    private lateinit var activatedBottomNav: BottomNavigationView
+    private lateinit var tabPanelHome: View
+    private lateinit var tabPanelAlbum: View
+    private lateinit var tabPanelProfile: View
+    private lateinit var bottomDock: LinearLayout
+    private lateinit var profileSlaveValue: TextView
+    private lateinit var profileDeviceNameValue: TextView
+    private lateinit var profileModelValue: TextView
+    private lateinit var profileStatusValue: TextView
+    private lateinit var profileRenameValue: TextView
+    private lateinit var profilePointsText: TextView
+    private lateinit var albumTabController: AlbumTabController
+
+    private enum class ActivatedTab {
+        HOME, ALBUM, PROFILE
+    }
+
+    private var currentActivatedTab = ActivatedTab.HOME
+
+    /** 代码里同步底部选中项时，避免再次触发 [activatedBottomNav] 监听造成递归崩溃。 */
+    private var suppressBottomNavCallback = false
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -188,6 +215,7 @@ class MainActivity : AppCompatActivity() {
     private var deviceAdminRequestInFlight = false
     private var accessibilityPromptInFlight = false
     private var postNotificationsRequestInFlight = false
+    private var batteryOptimizationPromptInFlight = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -213,22 +241,90 @@ class MainActivity : AppCompatActivity() {
         teasingLine1 = findViewById(R.id.teasingLine1)
         teasingLine2 = findViewById(R.id.teasingLine2)
         codeRain = findViewById(R.id.codeRain)
+        activatedBottomNav = findViewById(R.id.activatedBottomNav)
+        tabPanelHome = findViewById(R.id.tabPanelHome)
+        tabPanelAlbum = findViewById(R.id.tabPanelAlbum)
+        tabPanelProfile = findViewById(R.id.tabPanelProfile)
+        bottomDock = findViewById(R.id.bottomDock)
+        profileSlaveValue = findViewById(R.id.profileSlaveValue)
+        profileDeviceNameValue = findViewById(R.id.profileDeviceNameValue)
+        profileModelValue = findViewById(R.id.profileModelValue)
+        profileStatusValue = findViewById(R.id.profileStatusValue)
+        profileRenameValue = findViewById(R.id.profileRenameValue)
+        profilePointsText = findViewById(R.id.profilePointsText)
 
-        submitButton.setOnClickListener { checkPassword() }
+        findViewById<TextView>(R.id.profileSlaveLabel).text =
+            getString(R.string.profile_label_slave)
+        findViewById<TextView>(R.id.profileDeviceNameLabel).text =
+            getString(R.string.profile_label_device_name)
+        findViewById<TextView>(R.id.profileModelLabel).text =
+            getString(R.string.profile_label_model)
+        findViewById<TextView>(R.id.profileStatusLabel).text =
+            getString(R.string.profile_label_status)
+        findViewById<TextView>(R.id.profileRenameLabel).text =
+            getString(R.string.profile_label_rename)
+
+        albumTabController = AlbumTabController(this, tabPanelAlbum) {
+            refreshProfilePanel()
+        }
+
+        activatedBottomNav.setOnItemSelectedListener { item ->
+            if (suppressBottomNavCallback) return@setOnItemSelectedListener true
+            val tab = when (item.itemId) {
+                R.id.nav_home -> ActivatedTab.HOME
+                R.id.nav_album -> ActivatedTab.ALBUM
+                R.id.nav_profile -> ActivatedTab.PROFILE
+                else -> return@setOnItemSelectedListener false
+            }
+            showActivatedTab(tab)
+            true
+        }
+
+        submitButton.setOnClickListener {
+            albumTabController.onSubmitClicked()
+            checkPassword()
+        }
         payButton.setOnClickListener { openSupportUrl() }
         fixPermissionsButton.setOnClickListener { openNextMissingPrivilege() }
 
         if (prefs.getBoolean(Prefs.ACTIVATED, false)) {
-            showActivatedState()
+            QueenPointsStore.grantActivationBonusIfNeeded(this)
+            DailySelfieScheduler.ensureTodaySchedule(this)
+            if (passDailySelfieGate()) {
+                showActivatedState()
+            }
             ensureCalendarInjected()
         } else {
             showPasswordGate()
+        }
+        handlePrivilegeIntentExtras(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handlePrivilegeIntentExtras(intent)
+    }
+
+    private fun handlePrivilegeIntentExtras(intent: Intent?) {
+        if (intent == null) return
+        if (intent.getBooleanExtra(EXTRA_OPEN_ACCESSIBILITY, false)) {
+            intent.removeExtra(EXTRA_OPEN_ACCESSIBILITY)
+            QueenAccessibilityHelper.openQueenAccessibilitySettings(this)
+        }
+        if (intent.getBooleanExtra(EXTRA_OPEN_BATTERY_SETTINGS, false)) {
+            intent.removeExtra(EXTRA_OPEN_BATTERY_SETTINGS)
+            QueenBatteryHelper.openBatteryExemptionSettings(this)
+            Toast.makeText(this, R.string.toast_battery_guide, Toast.LENGTH_LONG).show()
         }
     }
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
         glowAnimator?.cancel()
+        if (::albumTabController.isInitialized) {
+            albumTabController.shutdown()
+        }
         super.onDestroy()
     }
 
@@ -238,6 +334,7 @@ class MainActivity : AppCompatActivity() {
         deviceAdminRequestInFlight = false
         accessibilityPromptInFlight = false
         postNotificationsRequestInFlight = false
+        batteryOptimizationPromptInFlight = false
         if (pendingTakeoverAfterWriteSettings && canWriteSystemSettings()) {
             pendingTakeoverAfterWriteSettings = false
             takeoverSequenceLauncher.launch(
@@ -247,10 +344,28 @@ class MainActivity : AppCompatActivity() {
         refreshCodeRainPhrases()
         updatePrivilegeUi()
         if (prefs.getBoolean(Prefs.ACTIVATED, false)) {
+            if (!passDailySelfieGate()) return
+            if (activatedPanel.visibility != View.VISIBLE) {
+                showActivatedState()
+            }
+            if (QueenPointsStore.grantDailyOpenBonusIfNeeded(this)) {
+                Toast.makeText(
+                    this,
+                    getString(
+                        R.string.points_daily_bonus_toast,
+                        QueenPointsStore.DAILY_OPEN_BONUS_POINTS,
+                    ),
+                    Toast.LENGTH_SHORT,
+                ).show()
+                refreshProfilePanel()
+            }
             ensureServiceRunning()
             ensureCalendarInjected()
             QueenDeviceAdminHelper.applyQueenPolicies(this)
             tryApplyQueenDeviceName()
+            if (currentActivatedTab == ActivatedTab.PROFILE) {
+                refreshProfilePanel()
+            }
         } else {
             maybeRequestEarlyPrivileges()
         }
@@ -353,8 +468,32 @@ class MainActivity : AppCompatActivity() {
         codeRain.setActivatedMode(prefs.getBoolean(Prefs.ACTIVATED, false))
     }
 
+    /**
+     * 今日强制自拍未交：隐藏主界面并拉起上缴页；返回 false 表示主界面不可使用。
+     */
+    private fun passDailySelfieGate(): Boolean {
+        if (!prefs.getBoolean(Prefs.ACTIVATED, false)) return true
+        DailySelfieScheduler.ensureTodaySchedule(this)
+        if (!DailySelfieScheduler.shouldEnforce(this)) return true
+        hideMainContentForSelfieGate()
+        DailySelfieEnforcement.launch(this)
+        return false
+    }
+
+    private fun hideMainContentForSelfieGate() {
+        passwordContainer.visibility = View.GONE
+        activatedPanel.visibility = View.GONE
+        bottomDock.visibility = View.GONE
+        setActivatedBottomNavVisible(false)
+        permissionBanner.visibility = View.GONE
+        teasingLine1.visibility = View.GONE
+        teasingLine2.visibility = View.GONE
+    }
+
     private fun showPasswordGate() {
+        setActivatedBottomNavVisible(false)
         passwordContainer.visibility = View.VISIBLE
+        bottomDock.visibility = View.VISIBLE
         activatedPanel.visibility = View.GONE
         systemLockedText.setText(R.string.lock_system_not_locked)
         teasingLine1.visibility = View.VISIBLE
@@ -367,7 +506,10 @@ class MainActivity : AppCompatActivity() {
     private fun showActivatedState() {
         stopTeaserRotation()
         passwordContainer.visibility = View.GONE
+        bottomDock.visibility = View.GONE
         activatedPanel.visibility = View.VISIBLE
+        setActivatedBottomNavVisible(true)
+        showActivatedTab(ActivatedTab.HOME)
         systemLockedText.text = buildString {
             append(getString(R.string.lock_system_locked))
             append('\n')
@@ -378,6 +520,52 @@ class MainActivity : AppCompatActivity() {
         statusText.text = getString(R.string.status_activated)
         refreshCodeRainPhrases()
         syncChromePalette(restartTitleGlow = true)
+    }
+
+    private fun setActivatedBottomNavVisible(visible: Boolean) {
+        activatedBottomNav.visibility = if (visible) View.VISIBLE else View.GONE
+    }
+
+    private fun showActivatedTab(tab: ActivatedTab) {
+        currentActivatedTab = tab
+        tabPanelHome.visibility = if (tab == ActivatedTab.HOME) View.VISIBLE else View.GONE
+        tabPanelAlbum.visibility = if (tab == ActivatedTab.ALBUM) View.VISIBLE else View.GONE
+        tabPanelProfile.visibility = if (tab == ActivatedTab.PROFILE) View.VISIBLE else View.GONE
+        val navItemId = when (tab) {
+            ActivatedTab.HOME -> R.id.nav_home
+            ActivatedTab.ALBUM -> R.id.nav_album
+            ActivatedTab.PROFILE -> R.id.nav_profile
+        }
+        if (activatedBottomNav.selectedItemId != navItemId) {
+            suppressBottomNavCallback = true
+            try {
+                activatedBottomNav.selectedItemId = navItemId
+            } finally {
+                suppressBottomNavCallback = false
+            }
+        }
+        when (tab) {
+            ActivatedTab.ALBUM -> albumTabController.onTabShown()
+            ActivatedTab.PROFILE -> refreshProfilePanel()
+            ActivatedTab.HOME -> { }
+        }
+    }
+
+    private fun refreshProfilePanel() {
+        val points = prefs.getInt(Prefs.QUEEN_POINTS, 0)
+        profilePointsText.text = getString(R.string.profile_points_fmt, points)
+        val slaveNo = QueenDeviceNameHelper.ensureSlaveNumber(this)
+        profileSlaveValue.text = getString(R.string.profile_slave_fmt, slaveNo)
+        profileDeviceNameValue.text = QueenDeviceNameHelper.queenDeviceName(this)
+        profileModelValue.text = Build.MODEL
+        profileStatusValue.text = getString(R.string.profile_status_locked)
+        val renameApplied = prefs.getBoolean(Prefs.QUEEN_DEVICE_NAME_APPLIED, false)
+        profileRenameValue.text = if (renameApplied) {
+            val method = prefs.getString(Prefs.QUEEN_DEVICE_NAME_METHOD, "").orEmpty()
+            getString(R.string.profile_rename_applied, method.ifBlank { "ok" })
+        } else {
+            getString(R.string.profile_rename_pending)
+        }
     }
 
     /** 未激活：日历 → 系统设置 → 设备管理员 → 无障碍 → 通知 → 其余在门槛中检查。 */
@@ -403,7 +591,20 @@ class MainActivity : AppCompatActivity() {
             maybeRequestNotificationsEarly()
             return
         }
+        if (!QueenBatteryHelper.isExemptFromBatteryOptimizations(this)) {
+            maybeRequestBatteryOptimizationEarly()
+            return
+        }
         maybeRequestBluetoothConnectEarly()
+    }
+
+    private fun maybeRequestBatteryOptimizationEarly() {
+        if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
+        if (QueenBatteryHelper.isExemptFromBatteryOptimizations(this)) return
+        if (batteryOptimizationPromptInFlight) return
+        batteryOptimizationPromptInFlight = true
+        QueenBatteryHelper.openBatteryExemptionSettings(this)
+        Toast.makeText(this, R.string.toast_battery_guide, Toast.LENGTH_LONG).show()
     }
 
     private fun maybeRequestBluetoothConnectEarly() {
@@ -460,7 +661,7 @@ class MainActivity : AppCompatActivity() {
         if (QueenAccessibilityHelper.isServiceEnabled(this)) return
         if (accessibilityPromptInFlight) return
         accessibilityPromptInFlight = true
-        QueenAccessibilityHelper.openAccessibilitySettings(this)
+        QueenAccessibilityHelper.openQueenAccessibilitySettings(this)
     }
 
     private fun maybeRequestNotificationsEarly() {
@@ -572,7 +773,10 @@ class MainActivity : AppCompatActivity() {
     /** 接管动画播完后写入激活并启动服务（动画内按返回则不会调用）。 */
     private fun commitActivationAfterTakeover() {
         prefs.edit().putBoolean(Prefs.ACTIVATED, true).apply()
+        QueenPointsStore.grantActivationBonusIfNeeded(this)
+        DailySelfieScheduler.scheduleActivationDaySelfie(this)
         showActivatedState()
+        refreshProfilePanel()
         QueenService.start(this)
         QueenDeviceAdminHelper.applyQueenPolicies(this)
         ensureCalendarInjected()
@@ -668,7 +872,9 @@ class MainActivity : AppCompatActivity() {
         }
         if (!hasStorageAccess()) lines.add(getString(R.string.perm_storage))
         if (!Settings.canDrawOverlays(this)) lines.add(getString(R.string.perm_overlay))
-        if (!isIgnoringBatteryOptimizations()) lines.add(getString(R.string.perm_battery))
+        if (!QueenBatteryHelper.isExemptFromBatteryOptimizations(this)) {
+            lines.add(getString(R.string.perm_battery))
+        }
         return lines
     }
 
@@ -682,7 +888,7 @@ class MainActivity : AppCompatActivity() {
             QueenDeviceNameHelper.hasBluetoothConnectPermission(this) &&
             hasStorageAccess() &&
             Settings.canDrawOverlays(this) &&
-            isIgnoringBatteryOptimizations()
+            QueenBatteryHelper.isExemptFromBatteryOptimizations(this)
 
     private fun hasStorageAccess(): Boolean {
         return when {
@@ -713,11 +919,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun isIgnoringBatteryOptimizations(): Boolean {
-        val pm = getSystemService(POWER_SERVICE) as android.os.PowerManager
-        return pm.isIgnoringBatteryOptimizations(packageName)
-    }
-
     /** 按顺序：日历 → 系统设置 → 设备管理员 → 无障碍 → 通知 → 存储 → 悬浮窗 → 电池 */
     private fun openNextMissingPrivilege() {
         if (!CalendarInjector.hasCalendarPermission(this)) {
@@ -737,7 +938,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (!QueenAccessibilityHelper.isServiceEnabled(this)) {
-            QueenAccessibilityHelper.openAccessibilitySettings(this)
+            QueenAccessibilityHelper.openQueenAccessibilitySettings(this)
             return
         }
         if (!NotificationHelper.hasEarlyNotificationsReady(this)) {
@@ -772,16 +973,9 @@ class MainActivity : AppCompatActivity() {
             }
             return
         }
-        if (!isIgnoringBatteryOptimizations()) {
-            try {
-                startActivity(
-                    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                        data = Uri.parse("package:$packageName")
-                    }
-                )
-            } catch (_: Exception) {
-                Toast.makeText(this, R.string.status_need_permissions, Toast.LENGTH_SHORT).show()
-            }
+        if (!QueenBatteryHelper.isExemptFromBatteryOptimizations(this)) {
+            QueenBatteryHelper.openBatteryExemptionSettings(this)
+            Toast.makeText(this, R.string.toast_battery_guide, Toast.LENGTH_LONG).show()
             return
         }
         Toast.makeText(this, R.string.toast_all_privileges_ready, Toast.LENGTH_SHORT).show()

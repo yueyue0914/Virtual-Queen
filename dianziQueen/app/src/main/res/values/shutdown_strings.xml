@@ -10,6 +10,8 @@
     <string name="device_admin_enabled_toast">设备管理员已激活 · Queen 开始封锁你的退路</string>
     <string name="device_admin_disabled_toast">你敢撤销管理员？等着被惩罚。</string>
     <string name="accessibility_service_description">Queen 电源拦截：监测关机/重启菜单并弹出羞辱拦截界面（需用户自愿开启）。</string>
+    <string name="accessibility_notify_title">无障碍已断开</string>
+    <string name="accessibility_notify_text">Queen 电源拦截已失效，点此重新开启无障碍服务</string>
 
     <string-array name="shutdown_threats">
         <item>敢关机？我就把你的耻辱照片全部公开到网上，让全世界看你下跪。</item>

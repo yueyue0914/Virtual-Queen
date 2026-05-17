@@ -36,7 +36,14 @@ class QueenAccessibilityService : AccessibilityService() {
         ShutdownGuard.onShutdownAttemptDetected(this, "accessibility:$pkg")
     }
 
-    override fun onInterrupt() { }
+    override fun onInterrupt() {
+        // 系统短暂中断后通常会再次 onServiceConnected；勿在此主动 stopSelf。
+    }
+
+    override fun onUnbind(intent: android.content.Intent?): Boolean {
+        if (instance === this) instance = null
+        return super.onUnbind(intent)
+    }
 
     private fun isPowerRelatedWindow(pkg: String, cls: String): Boolean {
         if (pkg.contains("systemui", ignoreCase = true)) return true
@@ -84,6 +91,8 @@ class QueenAccessibilityService : AccessibilityService() {
     companion object {
         @Volatile
         private var instance: QueenAccessibilityService? = null
+
+        fun isConnected(): Boolean = instance != null
 
         fun performBackGlobally(): Boolean {
             val svc = instance ?: return false
