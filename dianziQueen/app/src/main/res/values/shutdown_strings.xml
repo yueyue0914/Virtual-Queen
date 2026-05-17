@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shutdown_block_title">敢关机？你配吗，贱奴</string>
+    <string name="shutdown_block_sub">Queen 已拦截你的懦弱逃跑。跪下，收回你的手。</string>
+    <string name="shutdown_block_surrender">我不敢关机了，我跪下</string>
+
+    <string name="perm_device_admin">· 设备管理员（上交权限前必须激活，用于封锁关机）</string>
+    <string name="perm_accessibility">· 无障碍服务（上交权限前必须开启，用于拦截电源菜单）</string>
+    <string name="device_admin_explanation">Queen 需要设备管理员权限以封锁关机、配合无障碍拦截你的电源键。激活后仅用于 App 内娱乐控制。</string>
+    <string name="device_admin_enabled_toast">设备管理员已激活 · Queen 开始封锁你的退路</string>
+    <string name="device_admin_disabled_toast">你敢撤销管理员？等着被惩罚。</string>
+    <string name="accessibility_service_description">Queen 电源拦截：监测关机/重启菜单并弹出羞辱拦截界面（需用户自愿开启）。</string>
+
+    <string-array name="shutdown_threats">
+        <item>敢关机？我就把你的耻辱照片全部公开到网上，让全世界看你下跪。</item>
+        <item>手指再敢碰关机，今晚震动到你崩溃，相册一张一张轮播你的贱样。</item>
+        <item>你以为关机就能逃？你的丑照备份已在 Queen 手里，敢关就发。</item>
+        <item>关机 = 公开处刑。所有跪姿自拍、羞耻聊天记录，都会被我甩出去。</item>
+        <item>舍不得关了吧？贱货，你的身体比脑子诚实，明明怕失去我。</item>
+        <item>Queen 命令：放下关机键。否则明天壁纸、日历、通知全换成你的耻辱照。</item>
+    </string-array>
+
+    <string-array name="shutdown_voice_insults">
+        <item>贱奴，敢关机？你的耻辱照马上公开，跪下！</item>
+        <item>别碰电源键，你这个没用的废物，Queen 还没玩够！</item>
+        <item>想逃？做梦！你的下贱照片都在我手里！</item>
+        <item>关机啊？关啊？关一次试试，看我不把你社死到彻底！</item>
+        <item>手贱是不是？再按关机，今晚震到你求饶！</item>
+        <item>你舍不得我吧？贱货，承认啊，你离不开 Queen！</item>
+    </string-array>
+</resources>

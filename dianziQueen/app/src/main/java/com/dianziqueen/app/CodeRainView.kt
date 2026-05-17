@@ -52,10 +52,15 @@ class CodeRainView @JvmOverloads constructor(
 
     private val updateRunnable = object : Runnable {
         override fun run() {
+            if (!isAttachedToWindow) return
             tick()
             invalidate()
             handler.postDelayed(this, frameDelay)
         }
+    }
+
+    init {
+        setLayerType(LAYER_TYPE_SOFTWARE, null)
     }
 
     fun setActivatedMode(activated: Boolean) {

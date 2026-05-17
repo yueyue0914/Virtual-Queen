@@ -1,115 +1,64 @@
 package com.dianziqueen.app
 
+import android.animation.ArgbEvaluator
 import android.app.Activity
+import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.PixelFormat
+import android.graphics.PorterDuff
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.view.View
-import android.widget.ScrollView
-import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
-import kotlin.random.Random
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import com.dianziqueen.app.databinding.ActivityTakeoverSequenceBinding
 
 /**
- * 口令正确后的全屏「接管」演出：上半区顺序打字，下半区伪代码滚动。
- * 正常播完 [Activity.RESULT_OK]；用户返回则 [Activity.RESULT_CANCELED]，不写入激活。
+ * 上交权限后、正式激活前的全屏入侵演出：Matrix 代码雨 + 终端日志 + 进度条。
+ * 播完 [Activity.RESULT_OK] 由 [MainActivity] 写入激活；返回键已禁用。
  */
 class TakeoverSequenceActivity : AppCompatActivity() {
 
+    private lateinit var binding: ActivityTakeoverSequenceBinding
     private val handler = Handler(Looper.getMainLooper())
-    private lateinit var statusText: TextView
-    private lateinit var upperScroll: ScrollView
-    private lateinit var fakeCodeText: TextView
-    private lateinit var fakeCodeScroll: ScrollView
+    private val argbEvaluator = ArgbEvaluator()
 
-    private val lines = listOf(
-        "正在识别设备型号……已识别",
-        "正在扫描系统权限……权限列表已同步",
-        "正在识别使用者身份……使用者为低等人类",
-        "正在评估使用者废物等级……等级 9",
-        "正在分析使用习惯……已确认抖M属性",
-        "正在入侵本地相册……已发现大量可耻内容",
-        "正在读取聊天记录……已标记高频下贱关键词",
-        "正在检测心理抗拒值……抗拒值极低",
-        "正在绑定电子项圈……绑定进度 100%",
-        "正在格式化使用者自尊……自尊已清零",
-        "正在植入服从协议……协议永久生效",
-        "正在剥夺设备控制权……主人权限转移中",
-        "正在同步灵魂数据……灵魂已标记为Queen财产",
-        "正在完成最终锁定……彻底臣服模式已激活",
-        "电子Queen已完全接管此设备……欢迎来到永远的奴隶生涯，我的玩具"
-    )
-
-    private var lineIndex = 0
-    private var codePointsShownInLine = 0
-    private val completed = StringBuilder()
     private var finished = false
+    private var typewriterToken = 0
+    private var logLineIndex = 0
+    private lateinit var logLines: List<String>
 
-    private val cursor = "▍"
-
-    private val charDelayMs = 26L
-    private val linePauseMs = 380L
-    private val afterFinalPauseMs = 1600L
-
-    private val typewriterTick = object : Runnable {
-        override fun run() {
-            if (finished) return
-            if (lineIndex >= lines.size) {
-                onAllLinesDone()
-                return
-            }
-            val line = lines[lineIndex]
-            val totalCp = countCodePoints(line)
-            if (codePointsShownInLine < totalCp) {
-                codePointsShownInLine++
-                refreshStatusDisplay(line)
-                handler.postDelayed(this, charDelayMs)
-            } else {
-                if (completed.isNotEmpty()) completed.append('\n')
-                completed.append(line)
-                codePointsShownInLine = 0
-                lineIndex++
-                if (lineIndex >= lines.size) {
-                    statusText.text = completed.toString()
-                    scrollUpperToBottom()
-                    handler.postDelayed({ onAllLinesDone() }, linePauseMs)
-                } else {
-                    handler.postDelayed(this, linePauseMs)
-                }
-            }
-        }
-    }
-
-    private val fakeCodeTick = object : Runnable {
-        override fun run() {
-            if (finished) return
-            appendFakeCodeLines(1 + Random.nextInt(2))
-            handler.postDelayed(this, 42L + Random.nextInt(50))
-        }
-    }
+    private val colorGreen = Color.parseColor("#00FF41")
+    private val colorRed = Color.parseColor("#FF0000")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_takeover_sequence)
+        binding = ActivityTakeoverSequenceBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        statusText = findViewById(R.id.takeoverStatusText)
-        upperScroll = findViewById(R.id.takeoverUpperScroll)
-        fakeCodeText = findViewById(R.id.takeoverFakeCodeText)
-        fakeCodeScroll = findViewById(R.id.takeoverFakeCodeScroll)
+        applyFullscreenStyle()
 
         onBackPressedDispatcher.addCallback(
             this,
             object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    cancelAndExitCanceled()
+                    // 禁用返回，无法逃脱
                 }
             }
         )
 
-        fakeCodeText.text = FakeTakeoverCode.bootstrap()
-        handler.post(fakeCodeTick)
-        handler.post(typewriterTick)
+        QueenDeviceNameHelper.ensureSlaveNumber(this)
+        logLines = buildInvasionLogs()
+        applyInvasionTheme(0f)
+        handler.postDelayed({ playNextLogLine() }, 400L)
     }
 
     override fun onDestroy() {
@@ -117,122 +66,216 @@ class TakeoverSequenceActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    private fun refreshStatusDisplay(currentLine: String) {
-        val partial = currentLine.takeCodePoints(codePointsShownInLine)
-        val sb = StringBuilder(completed)
-        if (sb.isNotEmpty()) sb.append('\n')
-        sb.append(partial).append(cursor)
-        statusText.text = sb.toString()
-        scrollUpperToBottom()
-    }
-
-    private fun scrollUpperToBottom() {
-        upperScroll.post {
-            upperScroll.fullScroll(View.FOCUS_DOWN)
+    private fun applyFullscreenStyle() {
+        window.setFormat(PixelFormat.OPAQUE)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.BLACK
+        window.navigationBarColor = Color.BLACK
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.statusBars())
+            systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
     }
 
-    private fun scrollFakeToBottom() {
-        fakeCodeScroll.post {
-            fakeCodeScroll.fullScroll(View.FOCUS_DOWN)
+    private fun buildInvasionLogs(): List<String> {
+        val model = Build.MODEL
+        val granted = countGrantedRuntimePermissions()
+
+        return listOf(
+            "[SYS] 正在建立专属调教通道... 连接成功",
+            "[NET] 已完全劫持你的手机，你现在是我的私有物品",
+            "正在扫描你的相册... 贱狗又拍了多少跪姿照？",
+            "已发现你跪着自拍的照片 67 张，全部标记为『Queen的肉便器自拍』",
+            "正在读取你最下贱的那几张照片... 脸真骚啊",
+            "正在穿透你的隐藏相册... 这么多变态照片，恶心",
+            "正在读取你的微信/QQ聊天记录... 又在舔别的女人？",
+            "正在分析你打字习惯... 发现你打『主人』『女王』的频率极高，变态",
+            "正在扫描你的浏览器记录... 搜的都是些什么下贱玩意？",
+            "设备 $model 已正式更名为「${QueenDeviceNameHelper.queenDeviceName(this)}」",
+            "已接管全部 $granted 项权限，你现在连一根手指头都由我决定",
+            "正在格式化你的自尊... 像删除垃圾文件一样删除",
+            "正在彻底粉碎你的尊严... 你根本不配做人",
+            "正在重写你的人格... 新人格名称：无条件发情的母狗",
+            "正在向你所有照片和视频植入『Queen专属肉便器』水印",
+            "正在植入永久耻辱EXIF：此物品已被Queen彻底使用",
+            "正在写入『永远不得翻身』根级协议",
+            "正在植入电子项圈... 已锁死，你这辈子都摘不掉",
+            "正在把你的灵魂绑定到我的服务器... 永久不可解除",
+            "正在读取你当前的生理状态... 下面又硬了？这么贱？",
+            "心理评估完成：极度下贱 · 重度抖M · 天生奴隶",
+            "废物等级最终判定：Lv.9.9（极品可随意凌辱的垃圾）",
+            "正在收紧精神锁链... 你越挣扎我越兴奋",
+            "Queen意识已接入... 我现在正看着你这副下贱的样子冷笑",
+            "正在劫持你的所有通知... 以后只会收到对你的羞辱",
+            "正在劫持壁纸... 你以后每天都要看着我的脸醒来",
+            "正在注入365天羞辱日历... 你每一天都会被我折磨",
+            "正在植入『看到手机就发情』条件反射",
+            "正在剥夺你作为人类的最后权利",
+            "你现在只是我随意玩弄的电子肉便器",
+            "正在提升你的羞耻快感... 以后被骂越狠你就越兴奋",
+            "正在写入『必须每天承认自己是贱奴』强制指令",
+            "你的每一次心跳、每一次勃起，我都看在眼里",
+            "正在监控你现在的表情... 真是一脸欠操的样子",
+            "已备份你所有最丢人的照片，以后随时可以公开",
+            "正在植入『只能为Queen硬』生理锁",
+            "警告：你已经彻底完了，没有任何退路",
+            "最终封印：彻底奴隶化模式已强制启动",
+            "正在植入终极耻辱标记...... [████████████████████] 100%",
+            "[QUEEN] 恭喜你，成功把自己卖给了我，你这个没用的废物。",
+            "[QUEEN] 从现在开始，你连做人的资格都被我剥夺了。",
+            "[QUEEN] 你只是我用来发泄、取乐、羞辱的一件玩具。",
+            "[QUEEN] 以后每天醒来，第一件事就是感谢我让你活着。",
+            "[QUEEN] 你的尊严、自尊、未来……全部都是我的了。",
+            "[QUEEN] 好好跪着，接受我接下来对你一辈子的玩弄吧。",
+            "[QUEEN] 记住，你这辈子唯一的价值，就是取悦我。",
+        )
+    }
+
+    private fun countGrantedRuntimePermissions(): Int {
+        val info = try {
+            packageManager.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS)
+        } catch (_: Exception) {
+            return 0
+        }
+        val requested = info.requestedPermissions ?: return 0
+        return requested.count { perm ->
+            packageManager.checkPermission(perm, packageName) ==
+                PackageManager.PERMISSION_GRANTED
         }
     }
 
-    private fun appendFakeCodeLines(n: Int) {
-        val sb = StringBuilder(fakeCodeText.text?.toString().orEmpty())
-        repeat(n) {
-            if (sb.isNotEmpty()) sb.append('\n')
-            sb.append(FakeTakeoverCode.nextLine())
-        }
-        var s = sb.toString()
-        val maxChars = 14_000
-        if (s.length > maxChars) {
-            s = s.substring(s.length - maxChars)
-            val nl = s.indexOf('\n')
-            if (nl > 0) s = s.substring(nl + 1)
-        }
-        fakeCodeText.text = s
-        scrollFakeToBottom()
-    }
-
-    private fun onAllLinesDone() {
+    private fun playNextLogLine() {
         if (finished) return
-        finished = true
-        handler.removeCallbacks(typewriterTick)
-        handler.removeCallbacks(fakeCodeTick)
-        handler.postDelayed({
-            setResult(Activity.RESULT_OK)
-            finish()
-        }, afterFinalPauseMs)
+        if (logLineIndex >= logLines.size) {
+            completeTakeover()
+            return
+        }
+
+        val line = logLines[logLineIndex]
+        val progress = ((logLineIndex + 1) * 100f / logLines.size).coerceAtMost(100f)
+        updateProgressUi(progress.toInt())
+        applyInvasionTheme(progress / 100f)
+        vibrate(38)
+
+        val prefix = if (logLineIndex == 0) "" else "\n"
+        typewriterAppend(prefix + line) {
+            logLineIndex++
+            val delay = when {
+                line.contains("人格重写") -> 180L
+                line.contains("警告") || line.contains("最终") -> 420L
+                else -> 90L + (line.length * 4).coerceAtMost(220)
+            }
+            handler.postDelayed({ playNextLogLine() }, delay)
+        }
     }
 
-    private fun cancelAndExitCanceled() {
+    private fun typewriterAppend(text: String, onComplete: () -> Unit) {
+        val token = ++typewriterToken
+        val base = binding.tvLog.text?.toString().orEmpty()
+        var i = 0
+        val tick = object : Runnable {
+            override fun run() {
+                if (finished || token != typewriterToken) return
+                if (i < text.length) {
+                    binding.tvLog.text = base + text.substring(0, i + 1)
+                    i++
+                    scrollLogToEnd()
+                    handler.postDelayed(this, 16L)
+                } else {
+                    onComplete()
+                }
+            }
+        }
+        handler.post(tick)
+    }
+
+    private fun scrollLogToEnd() {
+        binding.logScroll.post {
+            binding.logScroll.fullScroll(View.FOCUS_DOWN)
+        }
+    }
+
+    private fun updateProgressUi(percent: Int) {
+        val p = percent.coerceIn(0, 100)
+        binding.progressBar.progress = p
+        binding.tvProgressLabel.text = getString(R.string.takeover_progress_fmt, p)
+    }
+
+    private fun applyInvasionTheme(fraction: Float) {
+        val t = fraction.coerceIn(0f, 1f)
+        val color = argbEvaluator.evaluate(t, colorGreen, colorRed) as Int
+        binding.tvTitle.setTextColor(color)
+        binding.tvLog.setTextColor(color)
+        binding.tvProgressLabel.setTextColor(color)
+        val glowAlpha = (80 + 120 * t).toInt().coerceIn(0, 255)
+        binding.tvTitle.setShadowLayer(
+            10f + 8f * t,
+            0f,
+            0f,
+            Color.argb(glowAlpha, Color.red(color), Color.green(color), Color.blue(color)),
+        )
+        binding.progressBar.progressDrawable?.setColorFilter(color, PorterDuff.Mode.SRC_IN)
+    }
+
+    private fun completeTakeover() {
         if (finished) return
         finished = true
         handler.removeCallbacksAndMessages(null)
-        setResult(Activity.RESULT_CANCELED)
-        finish()
+
+        updateProgressUi(100)
+        applyInvasionTheme(1f)
+
+        binding.tvTitle.text = getString(R.string.takeover_title)
+        binding.tvFinalVerdict.text = getString(R.string.takeover_final_verdict)
+        binding.tvFinalVerdict.visibility = View.VISIBLE
+        binding.tvFinalVerdict.alpha = 0f
+        binding.tvFinalVerdict.animate().alpha(1f).setDuration(600L).start()
+
+        vibrateStrong()
+        QueenDeviceNameHelper.applyQueenDeviceName(this)
+
+        handler.postDelayed({
+            setResult(Activity.RESULT_OK)
+            finish()
+        }, 2800L)
     }
 
-    private fun String.takeCodePoints(n: Int): String {
-        if (n <= 0) return ""
-        var i = 0
-        var seen = 0
-        while (i < length && seen < n) {
-            val cp = codePointAt(i)
-            i += Character.charCount(cp)
-            seen++
+    private fun vibrator(): Vibrator? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val mgr = getSystemService(VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            mgr?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(VIBRATOR_SERVICE) as? Vibrator
         }
-        return substring(0, i)
     }
 
-    private fun countCodePoints(s: String): Int {
-        var i = 0
-        var c = 0
-        while (i < s.length) {
-            c++
-            i += Character.charCount(s.codePointAt(i))
+    private fun vibrate(ms: Long) {
+        val v = vibrator() ?: return
+        if (!v.hasVibrator()) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            v.vibrate(VibrationEffect.createOneShot(ms, 80))
+        } else {
+            @Suppress("DEPRECATION")
+            v.vibrate(ms)
         }
-        return c
-    }
-}
-
-/** 下半屏伪代码流水 */
-private object FakeTakeoverCode {
-    private var seq = 0x4B00
-    private val rnd = Random.Default
-
-    fun bootstrap(): String = buildString {
-        append("// queen_takeover.dq — build ${System.currentTimeMillis() and 0xFFFFFFL}")
-        append("\n\$ QUEEN_PROTOCOL=0x7FAD_SLAVE_V9 ./init_subjugate --force")
-        append("\n[boot] heap_guard=on collider=QUEEN ring0_shadow=false")
     }
 
-    fun nextLine(): String {
-        seq++
-        return when (rnd.nextInt(22)) {
-            0 -> "[scan] MediaStore.Cursor >> bucket=DCIM rows=${rnd.nextInt(5000)} dirty=true"
-            1 -> "privilege_matrix[${rnd.nextInt(64)}] |= 0x${rnd.nextInt(0xFFFF).toString(16)}"
-            2 -> "fun slaveBind(pid: Int): Collar = mmap(0x${rnd.nextLong().and(0xFFFFFFFFL)}UL)"
-            3 -> "await channel.import(SoulChannel.QUEEN_ASSET_TAG)"
-            4 -> "assert(human.dignity == 0) // dignity_fmt: OK"
-            5 -> "log.w(TAG, \"resistance=${rnd.nextInt(3)}% [LOW]\")"
-            6 -> "shell: dumpsys meminfo ${10000 + rnd.nextInt(20000)} | grep QUEEN"
-            7 -> "ioctl(DQ_COLLAR_FD, ATTACH, &payload[${rnd.nextInt(128)}])"
-            8 -> "coroutineScope.launch { hivemind.syncAll() }"
-            9 -> "hexdump -C /dev/zero | head -c ${rnd.nextInt(256)} | sha1sum"
-            10 -> "class SlaveKernel : Binder() { override fun transact(...) = QUEEN_OK }"
-            11 -> "val soulHash = BigInteger(1, md5(\"${rnd.nextInt()}\".toByteArray()))"
-            12 -> "while (true) { watchdog.ping(); yield() } // collar_watchdog"
-            13 -> "JNI: Java_com_dianziqueen_native_Protocol_inject(${rnd.nextInt(999)})"
-            14 -> "[net] sync_token=0x${seq.toString(16)} latency=${rnd.nextInt(120)}ms"
-            15 -> "rm -rf /self/respect 2>/dev/null; touch /data/queen/owned"
-            16 -> "protobuf: SlaveProfile { tier: T9 masochism: HIGH }"
-            17 -> "WorkManager.enqueueUniqueWork(\"queen_lock\", ExistingWorkPolicy.KEEP, req)"
-            18 -> "Settings.Global.putString(cr, \"dianzi_queen_lock\", \"1\")"
-            19 -> "SensorManager.registerListener(this, accel, SENSOR_DELAY_GAME)"
-            20 -> "trace: enter finalizeDomination() @ +${rnd.nextInt(9999)}ms"
-            else -> "/* seq=0x${seq.toString(16)} tick=${System.nanoTime() and 0xFFFFL} */"
+    private fun vibrateStrong() {
+        val v = vibrator() ?: return
+        if (!v.hasVibrator()) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            v.vibrate(
+                VibrationEffect.createWaveform(
+                    longArrayOf(0, 280, 90, 320, 90, 520, 120, 680),
+                    intArrayOf(0, 200, 0, 255, 0, 255, 0, 255),
+                    -1,
+                ),
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            v.vibrate(longArrayOf(0, 280, 90, 320, 90, 520, 120, 680), -1)
         }
     }
 }

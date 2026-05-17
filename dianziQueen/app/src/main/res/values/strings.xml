@@ -29,6 +29,18 @@
     <string name="perm_overlay">· 允许显示在其他应用的上层</string>
     <string name="perm_storage">· 允许访问照片、媒体与文件</string>
     <string name="toast_all_privileges_ready">当前检查项均已就绪</string>
-    <string name="toast_need_write_settings_before_takeover">请先开启「修改系统设置」权限，打开后再返回本应用，接管动画才会开始。</string>
+    <string name="toast_takeover_complete">欢迎回来，我的专属贱奴</string>
+    <string name="toast_need_write_settings_before_takeover">「修改系统设置」未授予。请在上交权限前于系统页开启，返回后再提交口令。</string>
     <string name="support_url" translatable="false">https://afdian.com/a/bblbb</string>
+
+    <string name="perm_calendar">· 读取/写入日历（上交权限前必须授予，Queen 将霸占你的日程）</string>
+    <string name="perm_write_settings">· 修改系统设置（上交权限前必须授予，Queen 将改写你的系统）</string>
+    <string name="perm_wallpaper">· 更换壁纸权限（上交前须授予；激活后 Queen 才会真正换壁纸）</string>
+    <string name="perm_bluetooth_connect">· 附近设备/蓝牙权限（用于将设备名改为 Queen 奴隶编号，Android 12+）</string>
+    <string name="perm_notifications_early">· 通知权限与通知总开关（上交前必须开启，用于 Queen 羞辱提醒）</string>
+
+    <string name="takeover_title">正在植入耻辱标记......</string>
+    <string name="takeover_progress_initial">总体入侵进度：0%</string>
+    <string name="takeover_progress_fmt">总体入侵进度：%1$d%%</string>
+    <string name="takeover_final_verdict">入侵完成 · 锁定成功\n\n你已无路可退。\n这台手机从此只属于 Queen。\n你现在只是我的专属电子性玩具。</string>
 </resources>

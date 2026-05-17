@@ -29,4 +29,6 @@
     <color name="queen_surface">#1A0D0D</color>
     <color name="queen_on_surface">#FFCDD2</color>
     <color name="queen_error">#FF1744</color>
+    <color name="takeover_matrix_green">#00FF41</color>
+    <color name="takeover_blood_red">#FF0000</color>
 </resources>

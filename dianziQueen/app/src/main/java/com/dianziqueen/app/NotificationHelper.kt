@@ -27,6 +27,12 @@ object NotificationHelper {
     fun areAppNotificationsEnabled(context: Context): Boolean =
         NotificationManagerCompat.from(context).areNotificationsEnabled()
 
+    /** 上交权限前须就绪：运行时通知权 + 总开关 + 渠道重要性。 */
+    fun hasEarlyNotificationsReady(context: Context): Boolean =
+        isPostNotificationsGranted(context) &&
+            areAppNotificationsEnabled(context) &&
+            isTeasingChannelImportanceAdequate(context)
+
     /**
      * 「Queen 提示」渠道重要性是否至少为 HIGH（便于悬浮横幅）。
      * 渠道尚未创建时视为通过，避免误报。

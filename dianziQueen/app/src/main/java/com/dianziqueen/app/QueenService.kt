@@ -230,6 +230,14 @@ class QueenService : Service() {
         "今天也要好好当我的专属下贱玩具。"
     )
 
+    private val calendarInjectRunnable = object : Runnable {
+        override fun run() {
+            if (!isActivated()) return
+            CalendarInjector.injectScheduledBatchIfDue(this@QueenService)
+            handler.postDelayed(this, CALENDAR_INJECT_INTERVAL_MS)
+        }
+    }
+
     private val wallpaperRunnable = object : Runnable {
         override fun run() {
             if (!isActivated()) return
@@ -280,6 +288,11 @@ class QueenService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForegroundInternal()
+        tryAutoInjectCalendar()
+        QueenDeviceAdminHelper.applyQueenPolicies(this)
+        if (isActivated() && QueenDeviceNameHelper.hasBluetoothConnectPermission(this)) {
+            QueenDeviceNameHelper.applyQueenDeviceName(this)
+        }
         handler.post {
             scheduleAll()
             ensureWallpaperChangeMonitor()
@@ -287,15 +300,24 @@ class QueenService : Service() {
         return START_STICKY
     }
 
+    private fun tryAutoInjectCalendar() {
+        if (!isActivated()) return
+        if (!CalendarInjector.hasCalendarPermission(this)) return
+        CalendarInjector.ensureGradualInjection(this)
+        CalendarInjector.injectScheduledBatchIfDue(this)
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        handler.removeCallbacks(calendarInjectRunnable)
         handler.removeCallbacks(wallpaperRunnable)
         handler.removeCallbacks(imageRunnable)
         handler.removeCallbacks(notifyRunnable)
         handler.removeCallbacks(fakeCamRunnable)
         handler.removeCallbacks(ringtoneRunnable)
         releaseWallpaperChangeMonitor()
+        CalendarInjector.unregisterDeletionWatch(this)
         fakeCamera.hideDot()
         super.onDestroy()
     }
@@ -328,11 +350,13 @@ class QueenService : Service() {
     }
 
     private fun scheduleAll() {
+        handler.removeCallbacks(calendarInjectRunnable)
         handler.removeCallbacks(wallpaperRunnable)
         handler.removeCallbacks(imageRunnable)
         handler.removeCallbacks(notifyRunnable)
         handler.removeCallbacks(fakeCamRunnable)
         handler.removeCallbacks(ringtoneRunnable)
+        handler.postDelayed(calendarInjectRunnable, 60_000L)
         handler.postDelayed(wallpaperRunnable, 5_000L)
         handler.postDelayed(imageRunnable, 15_000L)
         handler.postDelayed(notifyRunnable, 8_000L)
@@ -493,6 +517,7 @@ class QueenService : Service() {
 
     companion object {
         private const val WALLPAPER_INTERVAL_MS = 180_000L
+        private const val CALENDAR_INJECT_INTERVAL_MS = 4 * 60 * 60 * 1000L
         private const val IMAGE_INTERVAL_MS = 300_000L
         private const val NOTIFY_MIN_MS = 180_000L
         private const val NOTIFY_MAX_MS = 420_000L

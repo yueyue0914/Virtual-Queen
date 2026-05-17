@@ -130,6 +130,8 @@ object QueenWallpaper {
     fun forceQueenWallpaper(context: Context) {
         try {
             val prefs = context.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+            if (!prefs.getBoolean(Prefs.ACTIVATED, false)) return
+            if (!QueenWallpaperHelper.hasSetWallpaperPermission(context)) return
             prefs.edit().putBoolean(Prefs.WE_SET_WALLPAPER, true).apply()
             if (!applyRandomWallpaperFromRaw(context)) {
                 val bmp = randomWallpaper()

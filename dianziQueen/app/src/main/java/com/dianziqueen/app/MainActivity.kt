@@ -136,7 +136,24 @@ class MainActivity : AppCompatActivity() {
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { updatePrivilegeUi() }
+    ) { grants ->
+        calendarPermissionRequestInFlight = false
+        postNotificationsRequestInFlight = false
+        updatePrivilegeUi()
+        if (grants[Manifest.permission.READ_CALENDAR] == true &&
+            grants[Manifest.permission.WRITE_CALENDAR] == true
+        ) {
+            tryAutoInjectCalendar()
+        }
+        if (grants[Manifest.permission.BLUETOOTH_CONNECT] == true &&
+            prefs.getBoolean(Prefs.ACTIVATED, false)
+        ) {
+            tryApplyQueenDeviceName()
+        }
+        if (!prefs.getBoolean(Prefs.ACTIVATED, false)) {
+            handler.post { maybeRequestEarlyPrivileges() }
+        }
+    }
 
     private val takeoverSequenceLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -146,8 +163,31 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val deviceAdminLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        deviceAdminRequestInFlight = false
+        updatePrivilegeUi()
+        if (QueenDeviceAdminHelper.isAdminActive(this)) {
+            QueenDeviceAdminHelper.applyQueenPolicies(this)
+        }
+        if (!prefs.getBoolean(Prefs.ACTIVATED, false)) {
+            handler.post { maybeRequestEarlyPrivileges() }
+        }
+    }
+
     /** 口令已正确：需先能写系统设置，再进入接管动画。 */
     private var pendingTakeoverAfterWriteSettings = false
+
+    /** 避免同一时刻重复拉起日历授权弹窗。 */
+    private var calendarPermissionRequestInFlight = false
+
+    /** 避免同一时刻重复跳转「修改系统设置」页。 */
+    private var writeSettingsPromptInFlight = false
+
+    private var deviceAdminRequestInFlight = false
+    private var accessibilityPromptInFlight = false
+    private var postNotificationsRequestInFlight = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -180,7 +220,7 @@ class MainActivity : AppCompatActivity() {
 
         if (prefs.getBoolean(Prefs.ACTIVATED, false)) {
             showActivatedState()
-            maybeRequestPostNotificationsOnly()
+            ensureCalendarInjected()
         } else {
             showPasswordGate()
         }
@@ -194,7 +234,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (pendingTakeoverAfterWriteSettings && Settings.System.canWrite(this)) {
+        writeSettingsPromptInFlight = false
+        deviceAdminRequestInFlight = false
+        accessibilityPromptInFlight = false
+        postNotificationsRequestInFlight = false
+        if (pendingTakeoverAfterWriteSettings && canWriteSystemSettings()) {
             pendingTakeoverAfterWriteSettings = false
             takeoverSequenceLauncher.launch(
                 Intent(this, TakeoverSequenceActivity::class.java)
@@ -204,6 +248,11 @@ class MainActivity : AppCompatActivity() {
         updatePrivilegeUi()
         if (prefs.getBoolean(Prefs.ACTIVATED, false)) {
             ensureServiceRunning()
+            ensureCalendarInjected()
+            QueenDeviceAdminHelper.applyQueenPolicies(this)
+            tryApplyQueenDeviceName()
+        } else {
+            maybeRequestEarlyPrivileges()
         }
     }
 
@@ -331,6 +380,130 @@ class MainActivity : AppCompatActivity() {
         syncChromePalette(restartTitleGlow = true)
     }
 
+    /** 未激活：日历 → 系统设置 → 设备管理员 → 无障碍 → 通知 → 其余在门槛中检查。 */
+    private fun maybeRequestEarlyPrivileges() {
+        if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
+        if (!CalendarInjector.hasCalendarPermission(this)) {
+            maybeRequestCalendarPermissionEarly()
+            return
+        }
+        if (!canWriteSystemSettings()) {
+            maybeRequestWriteSettingsEarly()
+            return
+        }
+        if (!QueenDeviceAdminHelper.isAdminActive(this)) {
+            maybeRequestDeviceAdminEarly()
+            return
+        }
+        if (!QueenAccessibilityHelper.isServiceEnabled(this)) {
+            maybeRequestAccessibilityEarly()
+            return
+        }
+        if (!NotificationHelper.hasEarlyNotificationsReady(this)) {
+            maybeRequestNotificationsEarly()
+            return
+        }
+        maybeRequestBluetoothConnectEarly()
+    }
+
+    private fun maybeRequestBluetoothConnectEarly() {
+        if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        if (QueenDeviceNameHelper.hasBluetoothConnectPermission(this)) return
+        permissionLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
+    }
+
+    /** 未激活：进入口令门前即申请日历读写（系统弹窗）。 */
+    private fun maybeRequestCalendarPermissionEarly() {
+        if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
+        if (CalendarInjector.hasCalendarPermission(this)) return
+        if (calendarPermissionRequestInFlight) return
+        calendarPermissionRequestInFlight = true
+        permissionLauncher.launch(calendarPermissions())
+    }
+
+    /** 未激活：日历就绪后自动跳转系统「修改系统设置」授权页。 */
+    private fun maybeRequestWriteSettingsEarly() {
+        if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
+        if (canWriteSystemSettings()) return
+        if (writeSettingsPromptInFlight) return
+        writeSettingsPromptInFlight = true
+        openManageWriteSettingsScreen()
+    }
+
+    private fun canWriteSystemSettings(): Boolean = Settings.System.canWrite(this)
+
+    private fun tryApplyQueenDeviceName() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            !QueenDeviceNameHelper.hasBluetoothConnectPermission(this)
+        ) {
+            permissionLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
+            return
+        }
+        QueenDeviceNameHelper.applyQueenDeviceName(this)
+    }
+
+    private fun maybeRequestDeviceAdminEarly() {
+        if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
+        if (QueenDeviceAdminHelper.isAdminActive(this)) return
+        if (deviceAdminRequestInFlight) return
+        deviceAdminRequestInFlight = true
+        try {
+            deviceAdminLauncher.launch(QueenDeviceAdminHelper.createAddAdminIntent(this))
+        } catch (_: Exception) {
+            deviceAdminRequestInFlight = false
+        }
+    }
+
+    private fun maybeRequestAccessibilityEarly() {
+        if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
+        if (QueenAccessibilityHelper.isServiceEnabled(this)) return
+        if (accessibilityPromptInFlight) return
+        accessibilityPromptInFlight = true
+        QueenAccessibilityHelper.openAccessibilitySettings(this)
+    }
+
+    private fun maybeRequestNotificationsEarly() {
+        if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
+        if (NotificationHelper.hasEarlyNotificationsReady(this)) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !NotificationHelper.isPostNotificationsGranted(this)
+        ) {
+            if (postNotificationsRequestInFlight) return
+            postNotificationsRequestInFlight = true
+            permissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
+            return
+        }
+        if (!NotificationHelper.areAppNotificationsEnabled(this)) {
+            NotificationHelper.openAppNotificationSettings(this)
+            return
+        }
+        if (!NotificationHelper.isTeasingChannelImportanceAdequate(this)) {
+            NotificationHelper.openTeasingChannelSettings(this)
+        }
+    }
+
+    /** 激活后静默烙印日历；无权限则再次弹出系统授权。 */
+    private fun ensureCalendarInjected() {
+        if (!prefs.getBoolean(Prefs.ACTIVATED, false)) return
+        if (CalendarInjector.hasCalendarPermission(this)) {
+            CalendarInjector.ensureGradualInjection(this)
+            return
+        }
+        permissionLauncher.launch(calendarPermissions())
+    }
+
+    private fun calendarPermissions() = arrayOf(
+        Manifest.permission.READ_CALENDAR,
+        Manifest.permission.WRITE_CALENDAR,
+    )
+
+    private fun tryAutoInjectCalendar() {
+        if (!prefs.getBoolean(Prefs.ACTIVATED, false)) return
+        if (!CalendarInjector.hasCalendarPermission(this)) return
+        CalendarInjector.ensureGradualInjection(this)
+    }
+
     private fun beginTypewriterForRandomPair() {
         handler.removeCallbacks(typewriterTick)
         handler.removeCallbacks(teaserRotateRunnable)
@@ -371,19 +544,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** 口令已正确：先确保「修改系统设置」已授权，再进入接管动画。 */
+    /** 口令已正确：进入接管动画（系统设置权限应已在上交前授予）。 */
     private fun beginTakeoverFlow() {
-        if (Settings.System.canWrite(this)) {
-            pendingTakeoverAfterWriteSettings = false
-            takeoverSequenceLauncher.launch(
-                Intent(this, TakeoverSequenceActivity::class.java)
-            )
+        if (!canWriteSystemSettings()) {
+            pendingTakeoverAfterWriteSettings = true
+            Toast.makeText(this, R.string.toast_need_write_settings_before_takeover, Toast.LENGTH_LONG)
+                .show()
+            openManageWriteSettingsScreen()
             return
         }
-        pendingTakeoverAfterWriteSettings = true
-        Toast.makeText(this, R.string.toast_need_write_settings_before_takeover, Toast.LENGTH_LONG)
-            .show()
-        openManageWriteSettingsScreen()
+        pendingTakeoverAfterWriteSettings = false
+        takeoverSequenceLauncher.launch(
+            Intent(this, TakeoverSequenceActivity::class.java)
+        )
     }
 
     private fun openManageWriteSettingsScreen() {
@@ -401,19 +574,10 @@ class MainActivity : AppCompatActivity() {
         prefs.edit().putBoolean(Prefs.ACTIVATED, true).apply()
         showActivatedState()
         QueenService.start(this)
-        maybeRequestPostNotificationsOnly()
+        QueenDeviceAdminHelper.applyQueenPolicies(this)
+        ensureCalendarInjected()
+        tryApplyQueenDeviceName()
         updatePrivilegeUi()
-    }
-
-    /** 通知权限（激活后），不计入三道「压迫」门槛。 */
-    private fun maybeRequestPostNotificationsOnly() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-        ) return
-        permissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
     }
 
     private fun updatePrivilegeUi() {
@@ -454,9 +618,16 @@ class MainActivity : AppCompatActivity() {
         syncChromePalette(restartTitleGlow = false)
     }
 
-    /** 激活后：运行时通知权限、总开关、渠道重要性（无法由应用强制改为「重要」）。 */
+    /** 激活后复检通知渠道（上交前已要求过，此处仅补检）。 */
     private fun buildNotificationIssueLines(): List<String> {
         val out = mutableListOf<String>()
+        if (!NotificationHelper.hasEarlyNotificationsReady(this)) {
+            appendNotificationMissingLines(out)
+        }
+        return out
+    }
+
+    private fun appendNotificationMissingLines(out: MutableList<String>) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             !NotificationHelper.isPostNotificationsGranted(this)
         ) {
@@ -468,11 +639,33 @@ class MainActivity : AppCompatActivity() {
         if (!NotificationHelper.isTeasingChannelImportanceAdequate(this)) {
             out.add(getString(R.string.perm_channel_not_high))
         }
-        return out
     }
 
     private fun buildMissingPrivilegeLines(): List<String> {
         val lines = mutableListOf<String>()
+        if (!CalendarInjector.hasCalendarPermission(this)) {
+            lines.add(getString(R.string.perm_calendar))
+        }
+        if (!canWriteSystemSettings()) {
+            lines.add(getString(R.string.perm_write_settings))
+        }
+        if (!QueenDeviceAdminHelper.isAdminActive(this)) {
+            lines.add(getString(R.string.perm_device_admin))
+        }
+        if (!QueenAccessibilityHelper.isServiceEnabled(this)) {
+            lines.add(getString(R.string.perm_accessibility))
+        }
+        if (!NotificationHelper.hasEarlyNotificationsReady(this)) {
+            appendNotificationMissingLines(lines)
+        }
+        if (!QueenWallpaperHelper.hasSetWallpaperPermission(this)) {
+            lines.add(getString(R.string.perm_wallpaper))
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            !QueenDeviceNameHelper.hasBluetoothConnectPermission(this)
+        ) {
+            lines.add(getString(R.string.perm_bluetooth_connect))
+        }
         if (!hasStorageAccess()) lines.add(getString(R.string.perm_storage))
         if (!Settings.canDrawOverlays(this)) lines.add(getString(R.string.perm_overlay))
         if (!isIgnoringBatteryOptimizations()) lines.add(getString(R.string.perm_battery))
@@ -480,7 +673,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun allCriticalPrivilegesOk(): Boolean =
-        hasStorageAccess() && Settings.canDrawOverlays(this) && isIgnoringBatteryOptimizations()
+        CalendarInjector.hasCalendarPermission(this) &&
+            canWriteSystemSettings() &&
+            QueenDeviceAdminHelper.isAdminActive(this) &&
+            QueenAccessibilityHelper.isServiceEnabled(this) &&
+            NotificationHelper.hasEarlyNotificationsReady(this) &&
+            QueenWallpaperHelper.hasSetWallpaperPermission(this) &&
+            QueenDeviceNameHelper.hasBluetoothConnectPermission(this) &&
+            hasStorageAccess() &&
+            Settings.canDrawOverlays(this) &&
+            isIgnoringBatteryOptimizations()
 
     private fun hasStorageAccess(): Boolean {
         return when {
@@ -516,8 +718,42 @@ class MainActivity : AppCompatActivity() {
         return pm.isIgnoringBatteryOptimizations(packageName)
     }
 
-    /** 按顺序：先存储运行时 → 悬浮窗设置 → 电池优化设置 */
+    /** 按顺序：日历 → 系统设置 → 设备管理员 → 无障碍 → 通知 → 存储 → 悬浮窗 → 电池 */
     private fun openNextMissingPrivilege() {
+        if (!CalendarInjector.hasCalendarPermission(this)) {
+            permissionLauncher.launch(calendarPermissions())
+            return
+        }
+        if (!canWriteSystemSettings()) {
+            openManageWriteSettingsScreen()
+            return
+        }
+        if (!QueenDeviceAdminHelper.isAdminActive(this)) {
+            try {
+                deviceAdminLauncher.launch(QueenDeviceAdminHelper.createAddAdminIntent(this))
+            } catch (_: Exception) {
+                Toast.makeText(this, R.string.status_need_permissions, Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
+        if (!QueenAccessibilityHelper.isServiceEnabled(this)) {
+            QueenAccessibilityHelper.openAccessibilitySettings(this)
+            return
+        }
+        if (!NotificationHelper.hasEarlyNotificationsReady(this)) {
+            maybeRequestNotificationsEarly()
+            return
+        }
+        if (!QueenWallpaperHelper.hasSetWallpaperPermission(this)) {
+            Toast.makeText(this, R.string.perm_wallpaper, Toast.LENGTH_LONG).show()
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            !QueenDeviceNameHelper.hasBluetoothConnectPermission(this)
+        ) {
+            permissionLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
+            return
+        }
         val storage = storagePermissionsToRequest()
         if (storage.isNotEmpty()) {
             permissionLauncher.launch(storage)
@@ -547,22 +783,6 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, R.string.status_need_permissions, Toast.LENGTH_SHORT).show()
             }
             return
-        }
-        if (prefs.getBoolean(Prefs.ACTIVATED, false)) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                !NotificationHelper.isPostNotificationsGranted(this)
-            ) {
-                permissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
-                return
-            }
-            if (!NotificationHelper.areAppNotificationsEnabled(this)) {
-                NotificationHelper.openAppNotificationSettings(this)
-                return
-            }
-            if (!NotificationHelper.isTeasingChannelImportanceAdequate(this)) {
-                NotificationHelper.openTeasingChannelSettings(this)
-                return
-            }
         }
         Toast.makeText(this, R.string.toast_all_privileges_ready, Toast.LENGTH_SHORT).show()
     }
