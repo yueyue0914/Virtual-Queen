@@ -207,6 +207,8 @@ object QueenFloatingOverlay {
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     if (dragging) {
                         savePosition(params.x, params.y)
+                        applyBubblePlacement()
+                        refreshWindowLayout()
                     } else {
                         toggleMenu()
                         appContext?.let { QueenVibratorHelper.lightTap(it) }
@@ -320,13 +322,79 @@ object QueenFloatingOverlay {
         val bubble = bubbleView ?: return
         handler.removeCallbacks(hideBubbleRunnable)
         bubble.text = text
+        applyBubblePlacement()
         bubble.visibility = View.VISIBLE
+        refreshWindowLayout()
         val duration = Random.nextLong(4_500L, 7_000L)
         handler.postDelayed(hideBubbleRunnable, duration)
     }
 
     private fun hideSpeechBubble() {
         bubbleView?.visibility = View.GONE
+        refreshWindowLayout()
+    }
+
+    /**
+     * 靠近屏幕顶部时气泡放在头像下方，避免气泡在上方把头像整体挤下去。
+     * 靠近底部时气泡放在头像上方。
+     */
+    private fun applyBubblePlacement() {
+        val root = rootView as? LinearLayout ?: return
+        val bubble = bubbleView ?: return
+        val avatar = avatarView ?: return
+        val menu = menuPanel ?: return
+        val below = shouldPlaceBubbleBelow()
+
+        val gapPx = (6 * (appContext?.resources?.displayMetrics?.density ?: 1f)).toInt()
+        val bubbleLp = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            topMargin = if (below) gapPx else 0
+            bottomMargin = if (below) 0 else gapPx
+        }
+        val avatarLp = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+        val menuLp = menu.layoutParams as? LinearLayout.LayoutParams
+            ?: LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            )
+
+        root.removeAllViews()
+        if (below) {
+            root.addView(avatar, avatarLp)
+            root.addView(bubble, bubbleLp)
+        } else {
+            root.addView(bubble, bubbleLp)
+            root.addView(avatar, avatarLp)
+        }
+        root.addView(menu, menuLp)
+    }
+
+    private fun shouldPlaceBubbleBelow(): Boolean {
+        val params = layoutParams ?: return true
+        val dm = appContext?.resources?.displayMetrics ?: return true
+        val topZone = (dm.heightPixels * 0.32f).toInt()
+        return params.y < topZone
+    }
+
+    private fun refreshWindowLayout() {
+        val root = rootView ?: return
+        val wm = windowManager ?: return
+        val params = layoutParams ?: return
+        root.requestLayout()
+        root.post {
+            clampToScreen(params)
+            try {
+                wm.updateViewLayout(root, params)
+            } catch (_: Exception) { }
+        }
     }
 
     private fun scheduleRandomTaunt() {

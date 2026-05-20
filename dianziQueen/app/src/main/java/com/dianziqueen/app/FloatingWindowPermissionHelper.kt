@@ -8,11 +8,12 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
 /**
- * 悬浮窗权限检测：标准 [Settings.canDrawOverlays] + 小米/红米 AppOps 补充判断。
+ * 悬浮窗权限：标准 [Settings.canDrawOverlays] + 小米/红米 AppOps 补充 + 引导弹窗。
  */
 object FloatingWindowPermissionHelper {
 
@@ -20,25 +21,28 @@ object FloatingWindowPermissionHelper {
     private const val PREF_OVERLAY_GUIDE_LAST_MS = "queen_overlay_guide_last_ms"
     private const val OVERLAY_GUIDE_COOLDOWN_MS = 6 * 60 * 60 * 1000L
 
+    /** 是否有悬浮窗权限（适配小米/红米）。 */
     fun hasPermission(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
         if (Settings.canDrawOverlays(context)) return true
         if (!isXiaomiFamily()) return false
-        return isXiaomiAppOpsGranted(context)
+        return isXiaomiOverlayGranted(context)
     }
 
-    fun isXiaomiFamily(): Boolean {
-        val manufacturer = Build.MANUFACTURER.lowercase()
+    fun isXiaomiFamily(): Boolean = isXiaomiDevice()
+
+    private fun isXiaomiDevice(): Boolean {
         val brand = Build.BRAND.lowercase()
-        return manufacturer.contains("xiaomi") ||
-            manufacturer.contains("redmi") ||
-            brand.contains("xiaomi") ||
+        val manufacturer = Build.MANUFACTURER.lowercase()
+        return brand.contains("xiaomi") ||
             brand.contains("redmi") ||
-            brand.contains("poco")
+            brand.contains("poco") ||
+            manufacturer.contains("xiaomi") ||
+            manufacturer.contains("redmi")
     }
 
-    /** 小米等机型上 Settings 可能误报，用 AppOps 再确认一次。 */
-    private fun isXiaomiAppOpsGranted(context: Context): Boolean {
+    /** 小米/红米：Settings 误报时用 AppOps 再确认。 */
+    private fun isXiaomiOverlayGranted(context: Context): Boolean {
         return try {
             val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
             val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -62,13 +66,20 @@ object FloatingWindowPermissionHelper {
         }
     }
 
+    fun requestPermission(activity: AppCompatActivity) {
+        if (hasPermission(activity)) return
+        openOverlaySettings(activity)
+    }
+
     fun openOverlaySettings(context: Context) {
         try {
             val intent = Intent(
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                 Uri.parse("package:${context.packageName}"),
             ).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                if (context !is AppCompatActivity) {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
             }
             context.startActivity(intent)
         } catch (e: Exception) {
@@ -76,7 +87,7 @@ object FloatingWindowPermissionHelper {
         }
     }
 
-    /** 尝试打开小米权限中心 / 自启动（失败则忽略）。 */
+    /** 尝试打开小米权限中心 / 自启动。 */
     fun tryOpenXiaomiExtraSettings(context: Context): Boolean {
         val pkg = context.packageName
         val candidates = listOf(
@@ -111,34 +122,68 @@ object FloatingWindowPermissionHelper {
         return false
     }
 
-    fun showPermissionGuideDialog(activity: AppCompatActivity) {
+    /** 小米/红米高强度引导（推荐）。 */
+    fun showXiaomiGuideDialog(activity: AppCompatActivity, onConfirmed: (() -> Unit)? = null) {
         if (activity.isFinishing || activity.isDestroyed) return
-        val message = if (isXiaomiFamily()) {
-            activity.getString(R.string.overlay_guide_message_xiaomi)
-        } else {
-            activity.getString(R.string.overlay_guide_message_generic)
+        AlertDialog.Builder(activity)
+            .setTitle(R.string.overlay_xiaomi_guide_title)
+            .setMessage(R.string.overlay_xiaomi_guide_message)
+            .setPositiveButton(R.string.overlay_xiaomi_guide_go) { _, _ ->
+                requestPermission(activity)
+                if (!tryOpenXiaomiExtraSettings(activity)) {
+                    openOverlaySettings(activity)
+                }
+                onConfirmed?.invoke()
+            }
+            .setNeutralButton(R.string.overlay_guide_xiaomi_extra) { _, _ ->
+                tryOpenXiaomiExtraSettings(activity)
+            }
+            .setNegativeButton(R.string.overlay_xiaomi_guide_later) { _, _ ->
+                Toast.makeText(activity, R.string.overlay_xiaomi_guide_later_toast, Toast.LENGTH_LONG).show()
+            }
+            .setCancelable(false)
+            .show()
+    }
+
+    /** 通用检查 + 引导（自检按钮、权限流程可调用）。 */
+    fun checkAndRequest(activity: AppCompatActivity) {
+        if (hasPermission(activity)) {
+            Toast.makeText(activity, R.string.overlay_already_granted, Toast.LENGTH_SHORT).show()
+            QueenService.start(activity)
+            return
         }
+        if (isXiaomiFamily()) {
+            showXiaomiGuideDialog(activity) {
+                QueenService.start(activity)
+            }
+        } else {
+            showGenericGuideDialog(activity)
+        }
+    }
+
+    fun showPermissionGuideDialog(activity: AppCompatActivity) {
+        if (isXiaomiFamily()) {
+            showXiaomiGuideDialog(activity)
+        } else {
+            showGenericGuideDialog(activity)
+        }
+    }
+
+    private fun showGenericGuideDialog(activity: AppCompatActivity) {
+        if (activity.isFinishing || activity.isDestroyed) return
         AlertDialog.Builder(activity)
             .setTitle(R.string.overlay_guide_title)
-            .setMessage(message)
+            .setMessage(R.string.overlay_guide_message_generic)
             .setPositiveButton(R.string.overlay_guide_go_settings) { _, _ ->
-                openOverlaySettings(activity)
-            }
-            .apply {
-                if (isXiaomiFamily()) {
-                    setNeutralButton(R.string.overlay_guide_xiaomi_extra) { _, _ ->
-                        if (!tryOpenXiaomiExtraSettings(activity)) {
-                            openOverlaySettings(activity)
-                        }
-                    }
-                }
+                requestPermission(activity)
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
     /**
-     * 激活后或回到前台：缺悬浮窗时提示（小米必弹；其它机型带冷却）。
+     * 激活后 / 回前台：缺权限时提示。
+     * 小米：更强弹窗；其它品牌：带冷却的普通引导。
      */
     fun maybePromptIfNeeded(activity: AppCompatActivity, force: Boolean = false) {
         if (hasPermission(activity)) return
@@ -149,13 +194,12 @@ object FloatingWindowPermissionHelper {
             if (now - last < OVERLAY_GUIDE_COOLDOWN_MS) return
         }
         prefs.edit().putLong(PREF_OVERLAY_GUIDE_LAST_MS, now).apply()
-        showPermissionGuideDialog(activity)
-    }
-
-    fun markGuideShown(context: Context) {
-        context.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putLong(PREF_OVERLAY_GUIDE_LAST_MS, System.currentTimeMillis())
-            .apply()
+        if (isXiaomiFamily()) {
+            showXiaomiGuideDialog(activity) {
+                QueenService.start(activity)
+            }
+        } else {
+            showGenericGuideDialog(activity)
+        }
     }
 }

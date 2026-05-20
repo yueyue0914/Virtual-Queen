@@ -852,20 +852,15 @@ class MainActivity : AppCompatActivity() {
         if (QueenPrivilegeAuditor.canDrawOverlays(this)) return
         markAutoPrivilegeGuideLaunched()
         if (FloatingWindowPermissionHelper.isXiaomiFamily()) {
-            FloatingWindowPermissionHelper.showPermissionGuideDialog(this)
+            FloatingWindowPermissionHelper.showXiaomiGuideDialog(this)
         } else {
-            FloatingWindowPermissionHelper.openOverlaySettings(this)
+            FloatingWindowPermissionHelper.requestPermission(this)
         }
     }
 
     /** 我的页：悬浮窗权限自检，一键跳转设置。 */
     private fun openOverlayPrivilegeSelfCheck() {
-        if (QueenPrivilegeAuditor.canDrawOverlays(this)) {
-            Toast.makeText(this, R.string.overlay_already_granted, Toast.LENGTH_SHORT).show()
-            QueenService.start(this)
-            return
-        }
-        FloatingWindowPermissionHelper.showPermissionGuideDialog(this)
+        FloatingWindowPermissionHelper.checkAndRequest(this)
     }
 
     private fun canWriteSystemSettings(): Boolean =

@@ -17,9 +17,7 @@ import kotlin.random.Random
 
 /**
  * 将设备/蓝牙显示名改为「电子女王的第XXX号电子贱奴」。
- *
- * [Settings.Global.DEVICE_NAME] 需 [Manifest.permission.WRITE_SECURE_SETTINGS]（普通应用默认无），
- * 无权限时跳过 Global 写入，避免 SecurityException 崩溃；优先蓝牙名与 System 表项。
+ * 优先级：蓝牙 → System(device_name) → Global(DEVICE_NAME，需 WRITE_SECURE_SETTINGS)。
  */
 object QueenDeviceNameHelper {
 
@@ -56,22 +54,8 @@ object QueenDeviceNameHelper {
             Manifest.permission.WRITE_SECURE_SETTINGS,
         ) == PackageManager.PERMISSION_GRANTED
 
-    /**
-     * @return 是否至少一种渠道写入成功
-     */
+    /** @return 是否至少一种渠道写入成功 */
     fun applyQueenDeviceName(context: Context): Boolean {
-        return try {
-            applyQueenDeviceNameInternal(context)
-        } catch (e: SecurityException) {
-            Log.e(TAG, "修改失败: ${e.message}")
-            false
-        } catch (e: Exception) {
-            Log.e(TAG, "未知错误", e)
-            false
-        }
-    }
-
-    private fun applyQueenDeviceNameInternal(context: Context): Boolean {
         val app = context.applicationContext
         val prefs = app.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
         if (prefs.getBoolean(Prefs.QUEEN_DEVICE_NAME_APPLIED, false)) {
@@ -79,41 +63,28 @@ object QueenDeviceNameHelper {
         }
 
         val name = queenDeviceName(context)
-        val showUiHint = context is Activity
+        var method: String? = null
 
-        val viaBluetooth = applyViaBluetooth(app, name)
-        val viaSystem = if (Settings.System.canWrite(app)) {
-            applyViaSystemSetting(app, name)
-        } else {
-            false
-        }
-        val viaGlobal = applyViaGlobalDeviceName(
-            context = app,
-            name = name,
-            showToastOnSkip = showUiHint && !viaBluetooth && !viaSystem,
-        )
-
-        val ok = viaBluetooth || viaSystem || viaGlobal
-        val method = when {
-            viaBluetooth -> "bluetooth"
-            viaSystem -> "system"
-            viaGlobal -> "global"
-            else -> null
+        if (applyViaBluetooth(app, name)) {
+            method = "bluetooth"
+        } else if (applyViaSystemSetting(app, name)) {
+            method = "system"
+        } else if (applyViaGlobalDeviceName(app, name)) {
+            method = "global"
         }
 
-        if (ok && method != null) {
-            prefs.edit()
-                .putBoolean(Prefs.QUEEN_DEVICE_NAME_APPLIED, true)
-                .putString(Prefs.QUEEN_DEVICE_NAME_METHOD, method)
-                .apply()
+        return if (method != null) {
+            saveSuccessRecord(app, method)
             Log.i(TAG, "设备名称修改成功 ($method): $name")
+            true
         } else {
             Log.w(
                 TAG,
-                "设备名写入未成功（可授予蓝牙/修改系统设置；Global 需 WRITE_SECURE_SETTINGS）: $name",
+                "设备名写入未成功（蓝牙/修改系统设置/Global；Global 需 WRITE_SECURE_SETTINGS）: $name",
             )
+            showSkipToastIfUi(context)
+            false
         }
-        return ok
     }
 
     @SuppressLint("MissingPermission")
@@ -125,6 +96,7 @@ object QueenDeviceNameHelper {
         }
         val adapter = BluetoothAdapter.getDefaultAdapter() ?: return false
         return try {
+            @Suppress("DEPRECATION")
             adapter.setName(name)
         } catch (e: SecurityException) {
             Log.e(TAG, "蓝牙 setName 被拒绝: ${e.message}")
@@ -136,6 +108,7 @@ object QueenDeviceNameHelper {
     }
 
     private fun applyViaSystemSetting(context: Context, name: String): Boolean {
+        if (!Settings.System.canWrite(context)) return false
         return try {
             val ok = Settings.System.putString(
                 context.contentResolver,
@@ -153,16 +126,9 @@ object QueenDeviceNameHelper {
         }
     }
 
-    private fun applyViaGlobalDeviceName(
-        context: Context,
-        name: String,
-        showToastOnSkip: Boolean = false,
-    ): Boolean {
+    private fun applyViaGlobalDeviceName(context: Context, name: String): Boolean {
         if (!hasWriteSecureSettingsPermission(context)) {
-            Log.w(TAG, "无 WRITE_SECURE_SETTINGS 权限，跳过设备名称修改")
-            if (showToastOnSkip) {
-                showSecureSettingsSkipToast(context)
-            }
+            Log.w(TAG, "无 WRITE_SECURE_SETTINGS 权限，跳过 Global 设备名")
             return false
         }
         return try {
@@ -171,14 +137,10 @@ object QueenDeviceNameHelper {
                 Settings.Global.DEVICE_NAME,
                 name,
             )
-            if (ok) {
-                Log.i(TAG, "Global 设备名修改成功: $name")
-            } else {
-                Log.w(TAG, "Global.putString(DEVICE_NAME) 返回 false")
-            }
+            if (!ok) Log.w(TAG, "Global.putString(DEVICE_NAME) 返回 false")
             ok
         } catch (e: SecurityException) {
-            Log.e(TAG, "修改失败: ${e.message}")
+            Log.e(TAG, "Global 设备名修改失败: ${e.message}")
             false
         } catch (e: Exception) {
             Log.e(TAG, "Global 设备名未知错误", e)
@@ -186,7 +148,17 @@ object QueenDeviceNameHelper {
         }
     }
 
-    private fun showSecureSettingsSkipToast(context: Context) {
+    private fun saveSuccessRecord(context: Context, method: String) {
+        context.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(Prefs.QUEEN_DEVICE_NAME_APPLIED, true)
+            .putString(Prefs.QUEEN_DEVICE_NAME_METHOD, method)
+            .apply()
+    }
+
+    /** 仅在界面场景提示，避免 Service 后台弹 Toast。 */
+    private fun showSkipToastIfUi(context: Context) {
+        if (context !is Activity) return
         Handler(Looper.getMainLooper()).post {
             Toast.makeText(
                 context.applicationContext,

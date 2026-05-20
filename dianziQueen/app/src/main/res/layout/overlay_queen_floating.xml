@@ -6,21 +6,7 @@
     android:orientation="vertical"
     android:padding="4dp">
 
-    <TextView
-        android:id="@+id/queenSpeechBubble"
-        android:layout_width="220dp"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="6dp"
-        android:background="@drawable/bg_queen_float_bubble"
-        android:ellipsize="end"
-        android:maxLines="4"
-        android:paddingHorizontal="10dp"
-        android:paddingVertical="8dp"
-        android:textColor="@color/text_red_primary"
-        android:textSize="13sp"
-        android:visibility="gone" />
-
+    <!-- 顺序由 QueenFloatingOverlay.applyBubblePlacement() 按屏幕位置动态调整 -->
     <ImageView
         android:id="@+id/queenFloatAvatar"
         android:layout_width="72dp"
@@ -30,6 +16,20 @@
         android:importantForAccessibility="yes"
         android:scaleType="fitCenter"
         android:src="@drawable/ic_queen_foreground" />
+
+    <TextView
+        android:id="@+id/queenSpeechBubble"
+        android:layout_width="220dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:background="@drawable/bg_queen_float_bubble"
+        android:ellipsize="end"
+        android:maxLines="4"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="8dp"
+        android:textColor="@color/text_red_primary"
+        android:textSize="13sp"
+        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/queenFloatMenu"
