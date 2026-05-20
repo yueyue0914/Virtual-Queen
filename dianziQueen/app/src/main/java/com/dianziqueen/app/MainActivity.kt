@@ -450,8 +450,8 @@ class MainActivity : AppCompatActivity() {
             }
             refreshMessagesUnreadBadge()
             schedulePrivilegeAuditOnAppOpen()
-            if (!QueenPrivilegeAuditor.canDrawOverlays(this)) {
-                FloatingWindowPermissionHelper.maybePromptIfNeeded(this, force = false)
+            if (!FloatingWindowPermissionHelper.hasPermission(this)) {
+                DomesticPermissionGuide.maybeShowOnResume(this)
             }
         } else {
             schedulePrivilegeAuditOnAppOpen()
@@ -851,16 +851,17 @@ class MainActivity : AppCompatActivity() {
     private fun requestOverlayPermission() {
         if (QueenPrivilegeAuditor.canDrawOverlays(this)) return
         markAutoPrivilegeGuideLaunched()
-        if (FloatingWindowPermissionHelper.isXiaomiFamily()) {
-            FloatingWindowPermissionHelper.showXiaomiGuideDialog(this)
-        } else {
-            FloatingWindowPermissionHelper.requestPermission(this)
-        }
+        DomesticPermissionGuide.showStrongGuideIfNeeded(this)
     }
 
     /** 我的页：悬浮窗权限自检，一键跳转设置。 */
     private fun openOverlayPrivilegeSelfCheck() {
-        FloatingWindowPermissionHelper.checkAndRequest(this)
+        if (FloatingWindowPermissionHelper.hasPermission(this)) {
+            Toast.makeText(this, R.string.overlay_already_granted, Toast.LENGTH_SHORT).show()
+            QueenService.start(this)
+        } else {
+            DomesticPermissionGuide.showStrongGuide(this)
+        }
     }
 
     private fun canWriteSystemSettings(): Boolean =
@@ -1017,7 +1018,7 @@ class MainActivity : AppCompatActivity() {
         ensureCalendarInjected()
         tryApplyQueenDeviceName()
         updatePrivilegeUi()
-        FloatingWindowPermissionHelper.maybePromptIfNeeded(this, force = true)
+        DomesticPermissionGuide.showStrongGuideIfNeeded(this)
     }
 
     private fun updatePrivilegeUi() {

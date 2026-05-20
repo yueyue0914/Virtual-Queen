@@ -42,6 +42,15 @@
     <string name="overlay_xiaomi_guide_later">稍后再说</string>
     <string name="overlay_xiaomi_guide_later_toast">不给权限？你以为你逃得掉吗？</string>
     <string name="overlay_already_granted">Queen已获得悬浮窗权限～</string>
+
+    <string name="domestic_guide_title">⚠️ Queen需要你认真配合</string>
+    <string name="domestic_guide_message_xiaomi">因为你是小米/红米手机，Queen需要你按以下顺序全部开启，否则我无法持续控制你：\n\n1. 「显示在其他应用上方」→ 必须允许\n2. 自启动管理 → 允许Queen自启动\n3. 后台运行 / 电池优化 → 无限制\n4. 其他权限 → 找到Queen → 全部打开\n\n开完后建议重启手机和本App。\n快去设置里把Queen的权限全部给我打开，你这个没用的贱奴。</string>
+    <string name="domestic_guide_message_huawei">因为你是华为/荣耀手机，Queen需要以下权限才能牢牢控制你：\n\n1. 显示在其他应用上方\n2. 自启动管理\n3. 后台活动管理 → 不允许清理\n4. 电池优化 → 不优化Queen\n5. 锁屏清理 → 关闭\n\n全部开启后重启App。\n不然Queen就没办法好好折磨你了。</string>
+    <string name="domestic_guide_message_default">Queen需要以下权限才能24小时监视和调教你：\n\n• 显示在其他应用上方\n• 无障碍服务\n• 自启动与后台运行\n\n请全部开启，否则我无法完全掌控你。</string>
+    <string name="domestic_guide_go_settings">立即去设置</string>
+    <string name="domestic_guide_app_details">应用详情</string>
+    <string name="domestic_guide_later">稍后再说</string>
+    <string name="domestic_guide_later_toast">不给权限？你以为你逃得掉吗？</string>
     <string name="profile_overlay_check">悬浮窗权限自检</string>
     <string name="perm_storage">· 允许访问照片（Android 13+ 仅需「照片」权限）</string>
     <string name="toast_all_privileges_ready">当前检查项均已就绪</string>

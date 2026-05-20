@@ -375,6 +375,9 @@ class QueenService : Service() {
             QueenFloatingOverlay.ensureShown(this)
         } else {
             QueenFloatingOverlay.hide()
+            if (isActivated() && !FloatingWindowPermissionHelper.hasPermission(this)) {
+                DomesticPermissionGuide.markPendingFromBackground(this)
+            }
         }
     }
 
