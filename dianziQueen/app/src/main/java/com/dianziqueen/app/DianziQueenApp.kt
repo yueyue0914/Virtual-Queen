@@ -18,6 +18,7 @@ class DianziQueenApp : Application() {
         createNotificationChannels()
         registerScreenshotBlockForAllActivities()
         initQueenMessageLibrary()
+        QueenErrorLogCollector.start(this)
     }
 
     /** 在此追加女王消息池文案（与 [QueenInsultLibrary] 默认库合并）。 */

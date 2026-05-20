@@ -134,4 +134,25 @@
     <string name="settings_release_ok">滚吧，暂时放你一马。别高兴太早，我随时能把你抓回来。</string>
     <string name="settings_release_not_activated">你还没资格谈释放，先跪下。</string>
     <string name="settings_release_points_insufficient">积分都不够还想跑？要 %1$d，你兜里才 %2$d，穷鬼。</string>
+
+    <string name="queen_float_avatar_desc">悬浮女王头像</string>
+    <string name="queen_float_welcome">点我。认罪、任务、惩罚，都在这。</string>
+    <string name="queen_float_menu_confess">立刻认罪</string>
+    <string name="queen_float_menu_daily">今日任务</string>
+    <string name="queen_float_menu_punish">请求惩罚</string>
+    <string name="queen_float_menu_selfie">自拍上交</string>
+    <string name="queen_float_menu_messages">圣旨消息</string>
+    <string name="queen_float_menu_dismiss">收起菜单</string>
+    <string name="queen_float_daily_enforced">今日自拍还没交，滚去拍。</string>
+    <string name="queen_float_daily_done">今日自拍已交。别得意，随时加罚。</string>
+    <string name="queen_float_selfie_go">去交。别让我等。</string>
+    <string name="queen_float_selfie_to_album">今日已交，去相册继续献祭。</string>
+
+    <string name="settings_float_avatar_title">悬浮女王头像</string>
+    <string name="settings_float_avatar_subtitle">切换后立刻生效；照片样式为圆形裁剪。</string>
+    <string name="settings_float_avatar_default_label">赛博徽记</string>
+    <string name="settings_float_avatar_nvw1_label">女王·壹</string>
+    <string name="settings_float_avatar_nvw2_label">女王·贰</string>
+    <string name="settings_float_avatar_nvw3_label">女王·叁</string>
+    <string name="settings_float_avatar_applied">头像已换，去屏幕上找 Queen。</string>
 </resources>

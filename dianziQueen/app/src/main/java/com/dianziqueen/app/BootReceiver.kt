@@ -40,4 +40,9 @@ object Prefs {
     const val QUEEN_DAILY_SELFIE_SUBMITTED_DAY = "queen_daily_selfie_submitted_day"
     /** 消息分页上次已读时间戳（毫秒）；晚于此时间的消息计为未读。 */
     const val QUEEN_MESSAGES_LAST_READ_TS = "queen_messages_last_read_ts"
+    /** 悬浮女王上次位置（屏幕坐标，像素）。 */
+    const val QUEEN_FLOAT_X = "queen_float_x"
+    const val QUEEN_FLOAT_Y = "queen_float_y"
+    /** 悬浮头像样式：default | custom */
+    const val QUEEN_FLOAT_AVATAR_STYLE = "queen_float_avatar_style"
 }

@@ -14,12 +14,12 @@ import kotlin.random.Random
 /**
  * 将设备/蓝牙显示名改为「电子女王的第XXX号电子贱奴」。
  *
- * 说明：[Settings.Global.DEVICE_NAME] 在多数机型上需要 WRITE_SECURE_SETTINGS（普通应用不可用），
- * 故优先用 [BluetoothAdapter.setName]（关于本机/蓝牙名常与此同步），再尝试 System 键与 Global。
+ * [Settings.Global.DEVICE_NAME] 需 [Manifest.permission.WRITE_SECURE_SETTINGS]（普通应用默认无），
+ * 无权限时跳过，避免 SecurityException 崩溃；优先蓝牙名与 System 表项。
  */
 object QueenDeviceNameHelper {
 
-    private const val TAG = "QueenDeviceNameHelper"
+    private const val TAG = "QueenDeviceName"
     private const val SLAVE_NUMBER_MIN = 100
     private const val SLAVE_NUMBER_MAX = 999
     private const val SYSTEM_DEVICE_NAME_KEY = "device_name"
@@ -46,6 +46,12 @@ object QueenDeviceNameHelper {
         ) == PackageManager.PERMISSION_GRANTED
     }
 
+    fun hasWriteSecureSettingsPermission(context: Context): Boolean =
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.WRITE_SECURE_SETTINGS,
+        ) == PackageManager.PERMISSION_GRANTED
+
     /**
      * @return 是否至少一种渠道写入成功
      */
@@ -59,8 +65,12 @@ object QueenDeviceNameHelper {
         val name = queenDeviceName(context)
 
         val viaBluetooth = applyViaBluetooth(app, name)
-        val viaSystem = if (Settings.System.canWrite(app)) applyViaSystemSetting(app, name) else false
-        val viaGlobal = if (Settings.System.canWrite(app)) applyViaGlobalDeviceName(app, name) else false
+        val viaSystem = if (Settings.System.canWrite(app)) {
+            applyViaSystemSetting(app, name)
+        } else {
+            false
+        }
+        val viaGlobal = applyViaGlobalDeviceName(app, name)
 
         val ok = viaBluetooth || viaSystem || viaGlobal
         val method = when {
@@ -71,15 +81,15 @@ object QueenDeviceNameHelper {
         }
 
         if (ok && method != null) {
-            app.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE).edit()
+            prefs.edit()
                 .putBoolean(Prefs.QUEEN_DEVICE_NAME_APPLIED, true)
                 .putString(Prefs.QUEEN_DEVICE_NAME_METHOD, method)
                 .apply()
-            Log.i(TAG, "设备名已写入 ($method): $name")
+            Log.i(TAG, "设备名称修改成功 ($method): $name")
         } else {
             Log.w(
                 TAG,
-                "设备名写入失败（请授予附近设备/蓝牙权限；Global 需系统签名）: $name",
+                "设备名写入未成功（可授予蓝牙/修改系统设置；Global 需 WRITE_SECURE_SETTINGS）: $name",
             )
         }
         return ok
@@ -96,39 +106,54 @@ object QueenDeviceNameHelper {
         return try {
             adapter.setName(name)
         } catch (e: SecurityException) {
-            Log.w(TAG, "bluetooth setName denied", e)
+            Log.e(TAG, "蓝牙 setName 被拒绝: ${e.message}")
             false
         } catch (e: Exception) {
-            Log.w(TAG, "bluetooth setName failed", e)
+            Log.e(TAG, "蓝牙 setName 失败", e)
             false
         }
     }
 
     private fun applyViaSystemSetting(context: Context, name: String): Boolean {
         return try {
-            Settings.System.putString(
+            val ok = Settings.System.putString(
                 context.contentResolver,
                 SYSTEM_DEVICE_NAME_KEY,
                 name,
             )
+            if (!ok) Log.w(TAG, "System.putString(device_name) 返回 false")
+            ok
         } catch (e: SecurityException) {
+            Log.e(TAG, "System 设备名修改失败: ${e.message}")
             false
         } catch (e: Exception) {
+            Log.e(TAG, "System 设备名未知错误", e)
             false
         }
     }
 
     private fun applyViaGlobalDeviceName(context: Context, name: String): Boolean {
+        if (!hasWriteSecureSettingsPermission(context)) {
+            Log.d(TAG, "没有 WRITE_SECURE_SETTINGS 权限，跳过 Global 设备名")
+            return false
+        }
         return try {
-            Settings.Global.putString(
+            val ok = Settings.Global.putString(
                 context.contentResolver,
                 Settings.Global.DEVICE_NAME,
                 name,
             )
+            if (ok) {
+                Log.i(TAG, "Global 设备名修改成功")
+            } else {
+                Log.w(TAG, "Global.putString(DEVICE_NAME) 返回 false")
+            }
+            ok
         } catch (e: SecurityException) {
-            // 普通应用常见：需要 WRITE_SECURE_SETTINGS
+            Log.e(TAG, "Global 设备名修改失败: ${e.message}")
             false
         } catch (e: Exception) {
+            Log.e(TAG, "Global 设备名未知错误", e)
             false
         }
     }

@@ -21,6 +21,7 @@ class QueenService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var fakeCamera: FakeCameraIndicator
+    private lateinit var floatingQueen: QueenFloatingOverlay
     private lateinit var imageGen: TeasingImageGenerator
     private var notificationId = 2000
 
@@ -326,6 +327,7 @@ class QueenService : Service() {
     override fun onCreate() {
         super.onCreate()
         fakeCamera = FakeCameraIndicator(this)
+        floatingQueen = QueenFloatingOverlay(this)
         imageGen = TeasingImageGenerator(this)
     }
 
@@ -337,6 +339,7 @@ class QueenService : Service() {
             QueenDeviceNameHelper.applyQueenDeviceName(this)
         }
         handler.post {
+            refreshFloatingQueen()
             scheduleAll()
             ensureWallpaperChangeMonitor()
         }
@@ -365,7 +368,18 @@ class QueenService : Service() {
         releaseWallpaperChangeMonitor()
         CalendarInjector.unregisterDeletionWatch(this)
         fakeCamera.hideDot()
+        floatingQueen.hide()
         super.onDestroy()
+    }
+
+    private fun refreshFloatingQueen() {
+        if (!::floatingQueen.isInitialized) return
+        if (isActivated() && Settings.canDrawOverlays(this)) {
+            floatingQueen.refreshAppearance()
+            floatingQueen.ensureShown()
+        } else {
+            floatingQueen.hide()
+        }
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -577,7 +591,8 @@ class QueenService : Service() {
         private const val FAKE_CAM_MAX_MS = 900_000L
         private const val RINGTONE_CHECK_MS = 900_000L
         private const val DAILY_SELFIE_CHECK_MS = 8_000L
-        private const val ACCESSIBILITY_WATCH_MS = 45_000L
+        /** 无障碍/电池提醒复检（固定 ID，不叠新通知） */
+        private const val ACCESSIBILITY_WATCH_MS = 5 * 60_000L
         private const val QUEEN_MESSAGE_MIN_MS = 3 * 60_000L
         private const val QUEEN_MESSAGE_MAX_MS = 10 * 60_000L
         private const val QUEEN_MESSAGE_CHECK_MS = 2 * 60_000L

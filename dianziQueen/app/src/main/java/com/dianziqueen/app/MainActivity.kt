@@ -29,6 +29,8 @@ class MainActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_OPEN_ACCESSIBILITY = "open_accessibility"
         const val EXTRA_OPEN_BATTERY_SETTINGS = "open_battery_settings"
+        const val EXTRA_OPEN_MESSAGES = "open_messages"
+        const val EXTRA_OPEN_ALBUM = "open_album"
     }
 
     /** 激活口令，支持中文。 */
@@ -344,12 +346,30 @@ class MainActivity : AppCompatActivity() {
             showPasswordGate()
         }
         handlePrivilegeIntentExtras(intent)
+        handleFloatingDeepLinkExtras(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         handlePrivilegeIntentExtras(intent)
+        handleFloatingDeepLinkExtras(intent)
+    }
+
+    private fun handleFloatingDeepLinkExtras(intent: Intent?) {
+        if (intent == null || !prefs.getBoolean(Prefs.ACTIVATED, false)) return
+        if (intent.getBooleanExtra(EXTRA_OPEN_MESSAGES, false)) {
+            intent.removeExtra(EXTRA_OPEN_MESSAGES)
+            if (::tabPanelMessages.isInitialized) {
+                showActivatedTab(ActivatedTab.MESSAGES)
+            }
+        }
+        if (intent.getBooleanExtra(EXTRA_OPEN_ALBUM, false)) {
+            intent.removeExtra(EXTRA_OPEN_ALBUM)
+            if (::tabPanelAlbum.isInitialized) {
+                showActivatedTab(ActivatedTab.ALBUM)
+            }
+        }
     }
 
     private fun handlePrivilegeIntentExtras(intent: Intent?) {

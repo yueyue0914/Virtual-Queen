@@ -79,6 +79,165 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:text="@string/settings_float_avatar_title"
+                android:textColor="@color/text_red_primary"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/settings_float_avatar_subtitle"
+                android:textColor="@color/text_red_dim"
+                android:textSize="11sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:id="@+id/settingsFloatStyleDefault"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_queen_float_style_option"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:padding="10dp">
+
+                    <ImageView
+                        android:id="@+id/settingsFloatPreviewDefault"
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:contentDescription="@string/settings_float_avatar_default_label"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_queen_foreground" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/settings_float_avatar_default_label"
+                        android:textColor="@color/text_red_primary"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/settingsFloatStyleNvw1"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_queen_float_style_option"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:padding="10dp">
+
+                    <ImageView
+                        android:id="@+id/settingsFloatPreviewNvw1"
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:contentDescription="@string/settings_float_avatar_nvw1_label"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/nvw1" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/settings_float_avatar_nvw1_label"
+                        android:textColor="@color/text_red_primary"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:id="@+id/settingsFloatStyleNvw2"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_queen_float_style_option"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:padding="10dp">
+
+                    <ImageView
+                        android:id="@+id/settingsFloatPreviewNvw2"
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:contentDescription="@string/settings_float_avatar_nvw2_label"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/nvw2" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/settings_float_avatar_nvw2_label"
+                        android:textColor="@color/text_red_primary"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/settingsFloatStyleNvw3"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_queen_float_style_option"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:padding="10dp">
+
+                    <ImageView
+                        android:id="@+id/settingsFloatPreviewNvw3"
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:contentDescription="@string/settings_float_avatar_nvw3_label"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/nvw3" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/settings_float_avatar_nvw3_label"
+                        android:textColor="@color/text_red_primary"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/bg_access_frame"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:text="@string/settings_release_title"
                 android:textColor="@color/crimson_glow"
                 android:textSize="16sp"

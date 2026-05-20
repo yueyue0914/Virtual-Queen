@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/queenFloatRoot"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="4dp">
+
+    <TextView
+        android:id="@+id/queenSpeechBubble"
+        android:layout_width="220dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="6dp"
+        android:background="@drawable/bg_queen_float_bubble"
+        android:ellipsize="end"
+        android:maxLines="4"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="8dp"
+        android:textColor="@color/text_red_primary"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/queenFloatAvatar"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:layout_gravity="center_horizontal"
+        android:contentDescription="@string/queen_float_avatar_desc"
+        android:importantForAccessibility="yes"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_queen_foreground" />
+
+    <LinearLayout
+        android:id="@+id/queenFloatMenu"
+        android:layout_width="200dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/bg_queen_float_menu"
+        android:orientation="vertical"
+        android:padding="6dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/queenMenuConfess"
+            style="@style/QueenFloatMenuItem"
+            android:text="@string/queen_float_menu_confess" />
+
+        <TextView
+            android:id="@+id/queenMenuDaily"
+            style="@style/QueenFloatMenuItem"
+            android:text="@string/queen_float_menu_daily" />
+
+        <TextView
+            android:id="@+id/queenMenuPunish"
+            style="@style/QueenFloatMenuItem"
+            android:text="@string/queen_float_menu_punish" />
+
+        <TextView
+            android:id="@+id/queenMenuSelfie"
+            style="@style/QueenFloatMenuItem"
+            android:text="@string/queen_float_menu_selfie" />
+
+        <TextView
+            android:id="@+id/queenMenuMessages"
+            style="@style/QueenFloatMenuItem"
+            android:text="@string/queen_float_menu_messages" />
+
+        <TextView
+            android:id="@+id/queenMenuDismiss"
+            style="@style/QueenFloatMenuItem"
+            android:text="@string/queen_float_menu_dismiss" />
+    </LinearLayout>
+</LinearLayout>
