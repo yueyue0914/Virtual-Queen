@@ -30,7 +30,14 @@
     <string name="battery_notify_text">Queen 后台服务可能被系统杀死，点此关闭电池优化</string>
     <string name="battery_notify_big_text">请在下一页选择「允许」「不限制」或「无限制」；国产机型还需在应用详情里将 DianziQueen 设为允许后台运行 / 高耗电。</string>
     <string name="toast_battery_guide">请选择「允许」忽略电池优化；小米/华为等请在应用详情中设为「无限制」或「允许后台高耗电」</string>
-    <string name="perm_overlay">· 允许显示在其他应用的上层</string>
+    <string name="perm_overlay">· 允许显示在其他应用的上层（小米需额外开启悬浮窗/自启动）</string>
+    <string name="overlay_guide_title">需要额外开启悬浮窗权限</string>
+    <string name="overlay_guide_message_xiaomi">检测到你是小米/红米手机，需要在以下地方都开启权限：\n\n1.「显示在其他应用上方」\n2. 应用自启动 + 后台运行（无限制）\n3. 其他权限 → 悬浮窗（如有单独入口）\n\nQueen 需要这些权限才能随时出现在你面前。</string>
+    <string name="overlay_guide_message_generic">请允许「显示在其他应用上方」，Queen 的悬浮头像才能出现在屏幕上。</string>
+    <string name="overlay_guide_go_settings">去设置</string>
+    <string name="overlay_guide_xiaomi_extra">小米权限中心</string>
+    <string name="overlay_already_granted">悬浮窗权限已就绪，Queen 会尽快现身。</string>
+    <string name="profile_overlay_check">悬浮窗权限自检</string>
     <string name="perm_storage">· 允许访问照片（Android 13+ 仅需「照片」权限）</string>
     <string name="toast_all_privileges_ready">当前检查项均已就绪</string>
     <string name="toast_takeover_complete">欢迎回来，我的专属贱奴</string>

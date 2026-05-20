@@ -331,6 +331,9 @@ class MainActivity : AppCompatActivity() {
         }
         payButton.setOnClickListener { openSupportUrl() }
         fixPermissionsButton.setOnClickListener { openNextMissingPrivilege() }
+        findViewById<Button>(R.id.profileOverlayCheckButton).setOnClickListener {
+            openOverlayPrivilegeSelfCheck()
+        }
         findViewById<Button>(R.id.profileSettingsButton).setOnClickListener {
             settingsLauncher.launch(Intent(this, QueenSettingsActivity::class.java))
         }
@@ -447,6 +450,9 @@ class MainActivity : AppCompatActivity() {
             }
             refreshMessagesUnreadBadge()
             schedulePrivilegeAuditOnAppOpen()
+            if (!QueenPrivilegeAuditor.canDrawOverlays(this)) {
+                FloatingWindowPermissionHelper.maybePromptIfNeeded(this, force = false)
+            }
         } else {
             schedulePrivilegeAuditOnAppOpen()
         }
@@ -845,16 +851,21 @@ class MainActivity : AppCompatActivity() {
     private fun requestOverlayPermission() {
         if (QueenPrivilegeAuditor.canDrawOverlays(this)) return
         markAutoPrivilegeGuideLaunched()
-        try {
-            startActivity(
-                Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:$packageName"),
-                ),
-            )
-        } catch (_: Exception) {
-            Toast.makeText(this, R.string.status_need_permissions, Toast.LENGTH_SHORT).show()
+        if (FloatingWindowPermissionHelper.isXiaomiFamily()) {
+            FloatingWindowPermissionHelper.showPermissionGuideDialog(this)
+        } else {
+            FloatingWindowPermissionHelper.openOverlaySettings(this)
         }
+    }
+
+    /** 我的页：悬浮窗权限自检，一键跳转设置。 */
+    private fun openOverlayPrivilegeSelfCheck() {
+        if (QueenPrivilegeAuditor.canDrawOverlays(this)) {
+            Toast.makeText(this, R.string.overlay_already_granted, Toast.LENGTH_SHORT).show()
+            QueenService.start(this)
+            return
+        }
+        FloatingWindowPermissionHelper.showPermissionGuideDialog(this)
     }
 
     private fun canWriteSystemSettings(): Boolean =
@@ -1011,6 +1022,7 @@ class MainActivity : AppCompatActivity() {
         ensureCalendarInjected()
         tryApplyQueenDeviceName()
         updatePrivilegeUi()
+        FloatingWindowPermissionHelper.maybePromptIfNeeded(this, force = true)
     }
 
     private fun updatePrivilegeUi() {

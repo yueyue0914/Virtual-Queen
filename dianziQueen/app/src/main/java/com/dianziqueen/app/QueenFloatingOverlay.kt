@@ -6,7 +6,6 @@ import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.provider.Settings
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -70,7 +69,7 @@ object QueenFloatingOverlay {
             hide()
             return
         }
-        if (!Settings.canDrawOverlays(appContext!!)) {
+        if (!FloatingWindowPermissionHelper.hasPermission(appContext!!)) {
             hide()
             return
         }

@@ -371,7 +371,7 @@ class QueenService : Service() {
     }
 
     private fun refreshFloatingQueen() {
-        if (isActivated() && Settings.canDrawOverlays(this)) {
+        if (isActivated() && FloatingWindowPermissionHelper.hasPermission(this)) {
             QueenFloatingOverlay.ensureShown(this)
         } else {
             QueenFloatingOverlay.hide()
@@ -485,7 +485,7 @@ class QueenService : Service() {
 
     private fun triggerFakeCameraEvent() {
         try {
-            if (Settings.canDrawOverlays(this)) {
+            if (FloatingWindowPermissionHelper.hasPermission(this)) {
                 val dotMs = Random.nextLong(2000L, 4000L)
                 fakeCamera.showFakeDot(dotMs)
                 val notifDelay = dotMs + Random.nextLong(1000L, 3000L)

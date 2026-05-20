@@ -77,7 +77,7 @@ object QueenPrivilegeAuditor {
         Settings.System.canWrite(context)
 
     fun canDrawOverlays(context: Context): Boolean =
-        Settings.canDrawOverlays(context)
+        FloatingWindowPermissionHelper.hasPermission(context)
 
     fun hasCameraPermission(context: Context): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
