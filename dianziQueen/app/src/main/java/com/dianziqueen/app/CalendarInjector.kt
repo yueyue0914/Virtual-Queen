@@ -3,6 +3,7 @@ package com.dianziqueen.app
 import android.Manifest
 import android.app.AlarmManager
 import android.app.PendingIntent
+import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -202,6 +203,38 @@ object CalendarInjector {
         }
     }
 
+    /** 按 [EVENT_TAG] 扫尾删除（兼容释放前未记入注册表的旧数据）。 */
+    fun deleteEventsByQueenTag(context: Context): Int {
+        if (!hasCalendarPermission(context)) return 0
+        var deleted = 0
+        val resolver = context.contentResolver
+        val projection = arrayOf(CalendarContract.Events._ID)
+        val selection =
+            "${CalendarContract.Events.DELETED} = 0 AND (${CalendarContract.Events.DESCRIPTION} LIKE ?)"
+        val args = arrayOf("%$EVENT_TAG%")
+        try {
+            resolver.query(
+                CalendarContract.Events.CONTENT_URI,
+                projection,
+                selection,
+                args,
+                null,
+            )?.use { cursor ->
+                val idCol = cursor.getColumnIndexOrThrow(CalendarContract.Events._ID)
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idCol)
+                    val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, id)
+                    try {
+                        if (resolver.delete(uri, null, null) > 0) deleted++
+                    } catch (_: Exception) { }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "deleteEventsByQueenTag", e)
+        }
+        return deleted
+    }
+
     fun cancelInjectAlarms(context: Context) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         val intent = Intent(context, CalendarInjectReceiver::class.java)
@@ -372,7 +405,10 @@ object CalendarInjector {
 
         return try {
             val uri = context.contentResolver.insert(CalendarContract.Events.CONTENT_URI, values)
-            uri != null
+                ?: return false
+            val eventId = ContentUris.parseId(uri)
+            QueenInjectionRegistry.recordCalendarEvent(context, eventId)
+            true
         } catch (e: Exception) {
             Log.e(TAG, "insertEvent: ${event.title}", e)
             false

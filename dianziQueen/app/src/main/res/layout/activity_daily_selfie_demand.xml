@@ -40,5 +40,24 @@
             android:text="@string/daily_selfie_capture_btn"
             android:textColor="@color/submit_text_black"
             android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/dailySelfieUploadButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_access_frame"
+            android:text="@string/daily_selfie_upload_btn"
+            android:textColor="@color/text_red_primary"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/dailySelfieUploadHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/daily_selfie_upload_hint"
+            android:textColor="@color/text_red_muted"
+            android:textSize="11sp" />
     </LinearLayout>
 </FrameLayout>

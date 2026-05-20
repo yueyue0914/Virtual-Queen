@@ -142,6 +142,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var activatedBottomNav: BottomNavigationView
     private lateinit var tabPanelHome: View
     private lateinit var tabPanelAlbum: View
+    private lateinit var tabPanelMessages: View
     private lateinit var tabPanelProfile: View
     private lateinit var bottomDock: LinearLayout
     private lateinit var profileSlaveValue: TextView
@@ -151,12 +152,20 @@ class MainActivity : AppCompatActivity() {
     private lateinit var profileRenameValue: TextView
     private lateinit var profilePointsText: TextView
     private lateinit var albumTabController: AlbumTabController
+    private lateinit var messagesTabController: MessagesTabController
 
     private enum class ActivatedTab {
-        HOME, ALBUM, PROFILE
+        HOME, ALBUM, MESSAGES, PROFILE
     }
 
     private var currentActivatedTab = ActivatedTab.HOME
+
+    private val messageUnreadListener = QueenMessageHub.Listener { _ ->
+        if (currentActivatedTab == ActivatedTab.MESSAGES) {
+            QueenMessageStore.markAllRead(this)
+        }
+        refreshMessagesUnreadBadge()
+    }
 
     /** 代码里同步底部选中项时，避免再次触发 [activatedBottomNav] 监听造成递归崩溃。 */
     private var suppressBottomNavCallback = false
@@ -164,22 +173,25 @@ class MainActivity : AppCompatActivity() {
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { grants ->
+        runtimePermissionDialogOpen = false
         calendarPermissionRequestInFlight = false
         postNotificationsRequestInFlight = false
+        cameraPermissionRequestInFlight = false
         updatePrivilegeUi()
         if (grants[Manifest.permission.READ_CALENDAR] == true &&
             grants[Manifest.permission.WRITE_CALENDAR] == true
         ) {
             tryAutoInjectCalendar()
         }
+        if (grants[Manifest.permission.CAMERA] == true) {
+            cameraAutoPromptAttempted = false
+        }
         if (grants[Manifest.permission.BLUETOOTH_CONNECT] == true &&
             prefs.getBoolean(Prefs.ACTIVATED, false)
         ) {
             tryApplyQueenDeviceName()
         }
-        if (!prefs.getBoolean(Prefs.ACTIVATED, false)) {
-            handler.post { maybeRequestEarlyPrivileges() }
-        }
+        handler.postDelayed({ continuePrivilegeAuditAfterRuntimeDialog() }, 320L)
     }
 
     private val takeoverSequenceLauncher = registerForActivityResult(
@@ -198,9 +210,17 @@ class MainActivity : AppCompatActivity() {
         if (QueenDeviceAdminHelper.isAdminActive(this)) {
             QueenDeviceAdminHelper.applyQueenPolicies(this)
         }
-        if (!prefs.getBoolean(Prefs.ACTIVATED, false)) {
-            handler.post { maybeRequestEarlyPrivileges() }
-        }
+        schedulePrivilegeAuditOnAppOpen()
+    }
+
+    private val settingsLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
+        showPasswordGate()
+        refreshProfilePanel()
+        updatePrivilegeUi()
+        syncChromePalette(restartTitleGlow = true)
     }
 
     /** 口令已正确：需先能写系统设置，再进入接管动画。 */
@@ -216,6 +236,20 @@ class MainActivity : AppCompatActivity() {
     private var accessibilityPromptInFlight = false
     private var postNotificationsRequestInFlight = false
     private var batteryOptimizationPromptInFlight = false
+    private var cameraPermissionRequestInFlight = false
+
+    /** 系统运行时权限弹窗是否正在显示（onResume 不得重置并重复 launch）。 */
+    private var runtimePermissionDialogOpen = false
+
+    /** 本会话是否已自动弹过相机授权（单次引导流程内防连弹；每次 onResume 会重置）。 */
+    private var cameraAutoPromptAttempted = false
+
+    private var privilegeAuditPass = 0
+
+    /** 自动跳转系统设置页后，短时间内不再自动拉起（避免从设置返回又被踢回去）。 */
+    private var lastAutoPrivilegeGuideAtMs = 0L
+
+    private val autoPrivilegeGuideCooldownMs = 15_000L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -244,6 +278,7 @@ class MainActivity : AppCompatActivity() {
         activatedBottomNav = findViewById(R.id.activatedBottomNav)
         tabPanelHome = findViewById(R.id.tabPanelHome)
         tabPanelAlbum = findViewById(R.id.tabPanelAlbum)
+        tabPanelMessages = findViewById(R.id.tabPanelMessages)
         tabPanelProfile = findViewById(R.id.tabPanelProfile)
         bottomDock = findViewById(R.id.bottomDock)
         profileSlaveValue = findViewById(R.id.profileSlaveValue)
@@ -267,12 +302,20 @@ class MainActivity : AppCompatActivity() {
         albumTabController = AlbumTabController(this, tabPanelAlbum) {
             refreshProfilePanel()
         }
+        messagesTabController = MessagesTabController(
+            this,
+            tabPanelMessages,
+            onPointsChanged = { refreshProfilePanel() },
+            onUnreadChanged = { refreshMessagesUnreadBadge() },
+        )
+        QueenMessageHub.addListener(messageUnreadListener)
 
         activatedBottomNav.setOnItemSelectedListener { item ->
             if (suppressBottomNavCallback) return@setOnItemSelectedListener true
             val tab = when (item.itemId) {
                 R.id.nav_home -> ActivatedTab.HOME
                 R.id.nav_album -> ActivatedTab.ALBUM
+                R.id.nav_messages -> ActivatedTab.MESSAGES
                 R.id.nav_profile -> ActivatedTab.PROFILE
                 else -> return@setOnItemSelectedListener false
             }
@@ -286,6 +329,9 @@ class MainActivity : AppCompatActivity() {
         }
         payButton.setOnClickListener { openSupportUrl() }
         fixPermissionsButton.setOnClickListener { openNextMissingPrivilege() }
+        findViewById<Button>(R.id.profileSettingsButton).setOnClickListener {
+            settingsLauncher.launch(Intent(this, QueenSettingsActivity::class.java))
+        }
 
         if (prefs.getBoolean(Prefs.ACTIVATED, false)) {
             QueenPointsStore.grantActivationBonusIfNeeded(this)
@@ -325,16 +371,29 @@ class MainActivity : AppCompatActivity() {
         if (::albumTabController.isInitialized) {
             albumTabController.shutdown()
         }
+        if (::messagesTabController.isInitialized) {
+            messagesTabController.shutdown()
+        }
+        QueenMessageHub.removeListener(messageUnreadListener)
         super.onDestroy()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        schedulePrivilegeAuditOnAppOpen()
     }
 
     override fun onResume() {
         super.onResume()
-        writeSettingsPromptInFlight = false
-        deviceAdminRequestInFlight = false
-        accessibilityPromptInFlight = false
-        postNotificationsRequestInFlight = false
-        batteryOptimizationPromptInFlight = false
+        // 仅重置「运行时权限弹窗」相关标志；勿重置无障碍/悬浮窗/电池等「已跳转设置」标志，
+        // 否则 onResume 触发的延迟复检会立刻再次 startActivity 打开设置页。
+        cameraPermissionRequestInFlight = false
+        calendarPermissionRequestInFlight = false
+        cameraAutoPromptAttempted = false
+        if (runtimePermissionDialogOpen) {
+            updatePrivilegeUi()
+            return
+        }
         if (pendingTakeoverAfterWriteSettings && canWriteSystemSettings()) {
             pendingTakeoverAfterWriteSettings = false
             takeoverSequenceLauncher.launch(
@@ -366,9 +425,63 @@ class MainActivity : AppCompatActivity() {
             if (currentActivatedTab == ActivatedTab.PROFILE) {
                 refreshProfilePanel()
             }
+            refreshMessagesUnreadBadge()
+            schedulePrivilegeAuditOnAppOpen()
+        } else {
+            schedulePrivilegeAuditOnAppOpen()
+        }
+    }
+
+    /** 每次打开 App：先刷新 UI；延迟复检仅更新横幅，自动跳设置须过冷却期。 */
+    private fun schedulePrivilegeAuditOnAppOpen() {
+        privilegeAuditPass = 0
+        updatePrivilegeUi()
+        if (runtimePermissionDialogOpen) return
+        handler.postDelayed({ runPrivilegeAuditPass(1, autoGuide = false) }, 400L)
+        handler.postDelayed({ runPrivilegeAuditPass(2, autoGuide = true) }, 1_600L)
+    }
+
+    private fun canAutoGuidePrivileges(): Boolean =
+        System.currentTimeMillis() - lastAutoPrivilegeGuideAtMs >= autoPrivilegeGuideCooldownMs
+
+    private fun markAutoPrivilegeGuideLaunched() {
+        lastAutoPrivilegeGuideAtMs = System.currentTimeMillis()
+    }
+
+    private fun runPrivilegeAuditPass(pass: Int, autoGuide: Boolean) {
+        if (runtimePermissionDialogOpen) return
+        privilegeAuditPass = pass
+        updatePrivilegeUi()
+        if (QueenPrivilegeAuditor.isAllCriticalOk(this)) {
+            writeSettingsPromptInFlight = false
+            deviceAdminRequestInFlight = false
+            accessibilityPromptInFlight = false
+            batteryOptimizationPromptInFlight = false
+            if (pass == 2 && prefs.getBoolean(Prefs.ACTIVATED, false)) {
+                tryApplyQueenDeviceName()
+                ensureCalendarInjected()
+            }
+            return
+        }
+        if (!autoGuide || !canAutoGuidePrivileges()) return
+        if (prefs.getBoolean(Prefs.ACTIVATED, false)) {
+            auditPrivilegesAfterActivation()
         } else {
             maybeRequestEarlyPrivileges()
         }
+    }
+
+    private fun continuePrivilegeAuditAfterRuntimeDialog() {
+        if (runtimePermissionDialogOpen) return
+        updatePrivilegeUi()
+        if (QueenPrivilegeAuditor.isAllCriticalOk(this)) return
+        runPrivilegeAuditPass(2, autoGuide = true)
+    }
+
+    private fun launchRuntimePermissions(permissions: Array<String>) {
+        if (runtimePermissionDialogOpen) return
+        runtimePermissionDialogOpen = true
+        permissionLauncher.launch(permissions)
     }
 
     private fun restartTitleGlowForCurrentMode() {
@@ -520,6 +633,27 @@ class MainActivity : AppCompatActivity() {
         statusText.text = getString(R.string.status_activated)
         refreshCodeRainPhrases()
         syncChromePalette(restartTitleGlow = true)
+        refreshMessagesUnreadBadge()
+    }
+
+    private fun refreshMessagesUnreadBadge() {
+        if (!::activatedBottomNav.isInitialized) return
+        if (!prefs.getBoolean(Prefs.ACTIVATED, false) ||
+            activatedBottomNav.visibility != View.VISIBLE
+        ) {
+            activatedBottomNav.removeBadge(R.id.nav_messages)
+            return
+        }
+        val unread = QueenMessageStore.getUnreadCount(this)
+        if (unread <= 0) {
+            activatedBottomNav.removeBadge(R.id.nav_messages)
+            return
+        }
+        val badge = activatedBottomNav.getOrCreateBadge(R.id.nav_messages)
+        badge.isVisible = true
+        badge.number = unread.coerceAtMost(99)
+        badge.backgroundColor = ContextCompat.getColor(this, R.color.crimson_glow)
+        badge.badgeTextColor = ContextCompat.getColor(this, R.color.pure_black)
     }
 
     private fun setActivatedBottomNavVisible(visible: Boolean) {
@@ -530,10 +664,12 @@ class MainActivity : AppCompatActivity() {
         currentActivatedTab = tab
         tabPanelHome.visibility = if (tab == ActivatedTab.HOME) View.VISIBLE else View.GONE
         tabPanelAlbum.visibility = if (tab == ActivatedTab.ALBUM) View.VISIBLE else View.GONE
+        tabPanelMessages.visibility = if (tab == ActivatedTab.MESSAGES) View.VISIBLE else View.GONE
         tabPanelProfile.visibility = if (tab == ActivatedTab.PROFILE) View.VISIBLE else View.GONE
         val navItemId = when (tab) {
             ActivatedTab.HOME -> R.id.nav_home
             ActivatedTab.ALBUM -> R.id.nav_album
+            ActivatedTab.MESSAGES -> R.id.nav_messages
             ActivatedTab.PROFILE -> R.id.nav_profile
         }
         if (activatedBottomNav.selectedItemId != navItemId) {
@@ -546,6 +682,7 @@ class MainActivity : AppCompatActivity() {
         }
         when (tab) {
             ActivatedTab.ALBUM -> albumTabController.onTabShown()
+            ActivatedTab.MESSAGES -> messagesTabController.onTabShown()
             ActivatedTab.PROFILE -> refreshProfilePanel()
             ActivatedTab.HOME -> { }
         }
@@ -568,84 +705,153 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** 未激活：日历 → 系统设置 → 设备管理员 → 无障碍 → 通知 → 其余在门槛中检查。 */
+    /** 未激活：进入时按顺序引导补齐权限。 */
     private fun maybeRequestEarlyPrivileges() {
         if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
-        if (!CalendarInjector.hasCalendarPermission(this)) {
-            maybeRequestCalendarPermissionEarly()
-            return
-        }
-        if (!canWriteSystemSettings()) {
-            maybeRequestWriteSettingsEarly()
-            return
-        }
-        if (!QueenDeviceAdminHelper.isAdminActive(this)) {
-            maybeRequestDeviceAdminEarly()
-            return
-        }
-        if (!QueenAccessibilityHelper.isServiceEnabled(this)) {
-            maybeRequestAccessibilityEarly()
-            return
-        }
-        if (!NotificationHelper.hasEarlyNotificationsReady(this)) {
-            maybeRequestNotificationsEarly()
-            return
-        }
-        if (!QueenBatteryHelper.isExemptFromBatteryOptimizations(this)) {
-            maybeRequestBatteryOptimizationEarly()
-            return
-        }
-        maybeRequestBluetoothConnectEarly()
+        requestNextMissingPrivilege(force = false)
     }
 
-    private fun maybeRequestBatteryOptimizationEarly() {
-        if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
+    /** 已激活：每次回到前台复检并引导补齐缺失权限。 */
+    private fun auditPrivilegesAfterActivation() {
+        if (!prefs.getBoolean(Prefs.ACTIVATED, false)) return
+        if (runtimePermissionDialogOpen) return
+        updatePrivilegeUi()
+        if (QueenPrivilegeAuditor.isAllCriticalOk(this)) return
+        requestNextMissingPrivilege(force = false)
+    }
+
+    /**
+     * 按固定顺序检查并引导下一项缺失权限（未激活/已激活共用）。
+     * 日历 → 系统设置 → 设备管理员 → 无障碍 → 通知 → 相机 → 电池 → 蓝牙 → 存储 → 悬浮窗
+     *
+     * @param force true 时忽略冷却（用户点击「去开启下一项」）
+     */
+    private fun requestNextMissingPrivilege(force: Boolean = false) {
+        if (runtimePermissionDialogOpen) return
+        if (!force && !canAutoGuidePrivileges()) return
+        val audit = QueenPrivilegeAuditor.audit(this)
+        for (privilege in audit.missing) {
+            when (privilege) {
+                QueenPrivilegeAuditor.Privilege.CALENDAR -> {
+                    requestCalendarPermission()
+                    return
+                }
+                QueenPrivilegeAuditor.Privilege.WRITE_SETTINGS -> {
+                    requestWriteSettings()
+                    return
+                }
+                QueenPrivilegeAuditor.Privilege.DEVICE_ADMIN -> {
+                    requestDeviceAdmin()
+                    return
+                }
+                QueenPrivilegeAuditor.Privilege.ACCESSIBILITY -> {
+                    requestAccessibility()
+                    return
+                }
+                QueenPrivilegeAuditor.Privilege.NOTIFICATIONS -> {
+                    requestNotifications()
+                    return
+                }
+                QueenPrivilegeAuditor.Privilege.CAMERA -> {
+                    requestCameraPermission()
+                    return
+                }
+                QueenPrivilegeAuditor.Privilege.WALLPAPER -> {
+                    Toast.makeText(this, R.string.perm_wallpaper, Toast.LENGTH_LONG).show()
+                    return
+                }
+                QueenPrivilegeAuditor.Privilege.BATTERY -> {
+                    requestBatteryOptimization()
+                    return
+                }
+                QueenPrivilegeAuditor.Privilege.BLUETOOTH -> {
+                    requestBluetoothConnect()
+                    return
+                }
+                QueenPrivilegeAuditor.Privilege.STORAGE -> {
+                    val storage = QueenPrivilegeAuditor.storagePermissionsToRequest(this)
+                    if (storage.isNotEmpty()) {
+                        launchRuntimePermissions(storage)
+                    }
+                    return
+                }
+                QueenPrivilegeAuditor.Privilege.OVERLAY -> {
+                    requestOverlayPermission()
+                    return
+                }
+            }
+        }
+    }
+
+    private fun requestCameraPermission() {
+        if (QueenPrivilegeAuditor.hasCameraPermission(this)) return
+        if (runtimePermissionDialogOpen || cameraPermissionRequestInFlight) return
+        if (cameraAutoPromptAttempted) return
+        cameraAutoPromptAttempted = true
+        cameraPermissionRequestInFlight = true
+        launchRuntimePermissions(arrayOf(Manifest.permission.CAMERA))
+    }
+
+    private fun requestBatteryOptimization() {
         if (QueenBatteryHelper.isExemptFromBatteryOptimizations(this)) return
         if (batteryOptimizationPromptInFlight) return
         batteryOptimizationPromptInFlight = true
+        markAutoPrivilegeGuideLaunched()
         QueenBatteryHelper.openBatteryExemptionSettings(this)
         Toast.makeText(this, R.string.toast_battery_guide, Toast.LENGTH_LONG).show()
     }
 
-    private fun maybeRequestBluetoothConnectEarly() {
-        if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
+    private fun requestBluetoothConnect() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
         if (QueenDeviceNameHelper.hasBluetoothConnectPermission(this)) return
-        permissionLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
+        launchRuntimePermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
     }
 
-    /** 未激活：进入口令门前即申请日历读写（系统弹窗）。 */
-    private fun maybeRequestCalendarPermissionEarly() {
-        if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
+    private fun requestCalendarPermission() {
         if (CalendarInjector.hasCalendarPermission(this)) return
-        if (calendarPermissionRequestInFlight) return
+        if (calendarPermissionRequestInFlight || runtimePermissionDialogOpen) return
         calendarPermissionRequestInFlight = true
-        permissionLauncher.launch(calendarPermissions())
+        launchRuntimePermissions(calendarPermissions())
     }
 
-    /** 未激活：日历就绪后自动跳转系统「修改系统设置」授权页。 */
-    private fun maybeRequestWriteSettingsEarly() {
-        if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
-        if (canWriteSystemSettings()) return
+    private fun requestWriteSettings() {
+        if (QueenPrivilegeAuditor.canWriteSystemSettings(this)) return
         if (writeSettingsPromptInFlight) return
         writeSettingsPromptInFlight = true
+        markAutoPrivilegeGuideLaunched()
         openManageWriteSettingsScreen()
     }
 
-    private fun canWriteSystemSettings(): Boolean = Settings.System.canWrite(this)
+    private fun requestOverlayPermission() {
+        if (QueenPrivilegeAuditor.canDrawOverlays(this)) return
+        markAutoPrivilegeGuideLaunched()
+        try {
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName"),
+                ),
+            )
+        } catch (_: Exception) {
+            Toast.makeText(this, R.string.status_need_permissions, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun canWriteSystemSettings(): Boolean =
+        QueenPrivilegeAuditor.canWriteSystemSettings(this)
 
     private fun tryApplyQueenDeviceName() {
+        if (runtimePermissionDialogOpen) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             !QueenDeviceNameHelper.hasBluetoothConnectPermission(this)
         ) {
-            permissionLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
+            launchRuntimePermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
             return
         }
         QueenDeviceNameHelper.applyQueenDeviceName(this)
     }
 
-    private fun maybeRequestDeviceAdminEarly() {
-        if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
+    private fun requestDeviceAdmin() {
         if (QueenDeviceAdminHelper.isAdminActive(this)) return
         if (deviceAdminRequestInFlight) return
         deviceAdminRequestInFlight = true
@@ -656,42 +862,43 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun maybeRequestAccessibilityEarly() {
-        if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
-        if (QueenAccessibilityHelper.isServiceEnabled(this)) return
+    private fun requestAccessibility() {
+        if (QueenAccessibilityHelper.isServiceEnabled(this)) {
+            accessibilityPromptInFlight = false
+            return
+        }
         if (accessibilityPromptInFlight) return
         accessibilityPromptInFlight = true
+        markAutoPrivilegeGuideLaunched()
         QueenAccessibilityHelper.openQueenAccessibilitySettings(this)
     }
 
-    private fun maybeRequestNotificationsEarly() {
-        if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
+    private fun requestNotifications() {
         if (NotificationHelper.hasEarlyNotificationsReady(this)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             !NotificationHelper.isPostNotificationsGranted(this)
         ) {
             if (postNotificationsRequestInFlight) return
             postNotificationsRequestInFlight = true
-            permissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
+            launchRuntimePermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
             return
         }
         if (!NotificationHelper.areAppNotificationsEnabled(this)) {
+            markAutoPrivilegeGuideLaunched()
             NotificationHelper.openAppNotificationSettings(this)
             return
         }
         if (!NotificationHelper.isTeasingChannelImportanceAdequate(this)) {
+            markAutoPrivilegeGuideLaunched()
             NotificationHelper.openTeasingChannelSettings(this)
         }
     }
 
-    /** 激活后静默烙印日历；无权限则再次弹出系统授权。 */
+    /** 激活后静默烙印日历（权限由统一复检流程申请，此处不再重复 launch）。 */
     private fun ensureCalendarInjected() {
         if (!prefs.getBoolean(Prefs.ACTIVATED, false)) return
-        if (CalendarInjector.hasCalendarPermission(this)) {
-            CalendarInjector.ensureGradualInjection(this)
-            return
-        }
-        permissionLauncher.launch(calendarPermissions())
+        if (!CalendarInjector.hasCalendarPermission(this)) return
+        CalendarInjector.ensureGradualInjection(this)
     }
 
     private fun calendarPermissions() = arrayOf(
@@ -731,8 +938,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkPassword() {
-        if (!allCriticalPrivilegesOk()) {
+        if (!QueenPrivilegeAuditor.isAllCriticalOk(this)) {
             Toast.makeText(this, R.string.status_need_permissions, Toast.LENGTH_SHORT).show()
+            schedulePrivilegeAuditOnAppOpen()
             return
         }
         val input = passwordInput.text?.toString()?.trim().orEmpty()
@@ -775,6 +983,7 @@ class MainActivity : AppCompatActivity() {
         prefs.edit().putBoolean(Prefs.ACTIVATED, true).apply()
         QueenPointsStore.grantActivationBonusIfNeeded(this)
         DailySelfieScheduler.scheduleActivationDaySelfie(this)
+        QueenMessageStore.ensureSessionOpened(this)
         showActivatedState()
         refreshProfilePanel()
         QueenService.start(this)
@@ -802,7 +1011,7 @@ class MainActivity : AppCompatActivity() {
             permissionMissingText.text = (critical + notifIssues).joinToString("\n")
         }
 
-        val ok = allCriticalPrivilegesOk()
+        val ok = QueenPrivilegeAuditor.isAllCriticalOk(this)
         if (!activated) {
             submitButton.isEnabled = ok
             submitButton.alpha = if (ok) 1f else 0.45f
@@ -858,9 +1067,14 @@ class MainActivity : AppCompatActivity() {
         }
         if (!QueenAccessibilityHelper.isServiceEnabled(this)) {
             lines.add(getString(R.string.perm_accessibility))
+        } else if (!QueenAccessibilityHelper.isServiceRunning(this)) {
+            lines.add(getString(R.string.perm_accessibility_not_running))
         }
         if (!NotificationHelper.hasEarlyNotificationsReady(this)) {
             appendNotificationMissingLines(lines)
+        }
+        if (!QueenPrivilegeAuditor.hasCameraPermission(this)) {
+            lines.add(getString(R.string.perm_camera))
         }
         if (!QueenWallpaperHelper.hasSetWallpaperPermission(this)) {
             lines.add(getString(R.string.perm_wallpaper))
@@ -870,168 +1084,28 @@ class MainActivity : AppCompatActivity() {
         ) {
             lines.add(getString(R.string.perm_bluetooth_connect))
         }
-        if (!hasStorageAccess()) lines.add(getString(R.string.perm_storage))
-        if (!Settings.canDrawOverlays(this)) lines.add(getString(R.string.perm_overlay))
+        if (!QueenPrivilegeAuditor.hasStorageAccess(this)) {
+            lines.add(getString(R.string.perm_storage))
+        }
+        if (!QueenPrivilegeAuditor.canDrawOverlays(this)) {
+            lines.add(getString(R.string.perm_overlay))
+        }
         if (!QueenBatteryHelper.isExemptFromBatteryOptimizations(this)) {
             lines.add(getString(R.string.perm_battery))
         }
         return lines
     }
 
-    private fun allCriticalPrivilegesOk(): Boolean =
-        CalendarInjector.hasCalendarPermission(this) &&
-            canWriteSystemSettings() &&
-            QueenDeviceAdminHelper.isAdminActive(this) &&
-            QueenAccessibilityHelper.isServiceEnabled(this) &&
-            NotificationHelper.hasEarlyNotificationsReady(this) &&
-            QueenWallpaperHelper.hasSetWallpaperPermission(this) &&
-            QueenDeviceNameHelper.hasBluetoothConnectPermission(this) &&
-            hasStorageAccess() &&
-            Settings.canDrawOverlays(this) &&
-            QueenBatteryHelper.isExemptFromBatteryOptimizations(this)
-
-    private fun hasStorageAccess(): Boolean {
-        return when {
-            Build.VERSION.SDK_INT >= 33 ->
-                ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.READ_MEDIA_IMAGES
-                ) == PackageManager.PERMISSION_GRANTED &&
-                    ContextCompat.checkSelfPermission(
-                        this,
-                        Manifest.permission.READ_MEDIA_VIDEO
-                    ) == PackageManager.PERMISSION_GRANTED
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->
-                ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.READ_EXTERNAL_STORAGE
-                ) == PackageManager.PERMISSION_GRANTED
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ->
-                ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.READ_EXTERNAL_STORAGE
-                ) == PackageManager.PERMISSION_GRANTED &&
-                    ContextCompat.checkSelfPermission(
-                        this,
-                        Manifest.permission.WRITE_EXTERNAL_STORAGE
-                    ) == PackageManager.PERMISSION_GRANTED
-            else -> true
-        }
-    }
-
-    /** 按顺序：日历 → 系统设置 → 设备管理员 → 无障碍 → 通知 → 存储 → 悬浮窗 → 电池 */
+    /** 用户点击「修复权限」：与启动复检共用同一套顺序。 */
     private fun openNextMissingPrivilege() {
-        if (!CalendarInjector.hasCalendarPermission(this)) {
-            permissionLauncher.launch(calendarPermissions())
+        updatePrivilegeUi()
+        if (QueenPrivilegeAuditor.isAllCriticalOk(this)) {
+            Toast.makeText(this, R.string.toast_all_privileges_ready, Toast.LENGTH_SHORT).show()
             return
         }
-        if (!canWriteSystemSettings()) {
-            openManageWriteSettingsScreen()
-            return
-        }
-        if (!QueenDeviceAdminHelper.isAdminActive(this)) {
-            try {
-                deviceAdminLauncher.launch(QueenDeviceAdminHelper.createAddAdminIntent(this))
-            } catch (_: Exception) {
-                Toast.makeText(this, R.string.status_need_permissions, Toast.LENGTH_SHORT).show()
-            }
-            return
-        }
-        if (!QueenAccessibilityHelper.isServiceEnabled(this)) {
-            QueenAccessibilityHelper.openQueenAccessibilitySettings(this)
-            return
-        }
-        if (!NotificationHelper.hasEarlyNotificationsReady(this)) {
-            maybeRequestNotificationsEarly()
-            return
-        }
-        if (!QueenWallpaperHelper.hasSetWallpaperPermission(this)) {
-            Toast.makeText(this, R.string.perm_wallpaper, Toast.LENGTH_LONG).show()
-            return
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-            !QueenDeviceNameHelper.hasBluetoothConnectPermission(this)
-        ) {
-            permissionLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
-            return
-        }
-        val storage = storagePermissionsToRequest()
-        if (storage.isNotEmpty()) {
-            permissionLauncher.launch(storage)
-            return
-        }
-        if (!Settings.canDrawOverlays(this)) {
-            try {
-                startActivity(
-                    Intent(
-                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        Uri.parse("package:$packageName")
-                    )
-                )
-            } catch (_: Exception) {
-                Toast.makeText(this, R.string.status_need_permissions, Toast.LENGTH_SHORT).show()
-            }
-            return
-        }
-        if (!QueenBatteryHelper.isExemptFromBatteryOptimizations(this)) {
-            QueenBatteryHelper.openBatteryExemptionSettings(this)
-            Toast.makeText(this, R.string.toast_battery_guide, Toast.LENGTH_LONG).show()
-            return
-        }
-        Toast.makeText(this, R.string.toast_all_privileges_ready, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun storagePermissionsToRequest(): Array<String> {
-        return when {
-            Build.VERSION.SDK_INT >= 33 -> {
-                val list = mutableListOf<String>()
-                if (ContextCompat.checkSelfPermission(
-                        this,
-                        Manifest.permission.READ_MEDIA_IMAGES
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    list.add(Manifest.permission.READ_MEDIA_IMAGES)
-                }
-                if (ContextCompat.checkSelfPermission(
-                        this,
-                        Manifest.permission.READ_MEDIA_VIDEO
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    list.add(Manifest.permission.READ_MEDIA_VIDEO)
-                }
-                list.toTypedArray()
-            }
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> {
-                if (ContextCompat.checkSelfPermission(
-                        this,
-                        Manifest.permission.READ_EXTERNAL_STORAGE
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
-                } else {
-                    emptyArray()
-                }
-            }
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> {
-                val list = mutableListOf<String>()
-                if (ContextCompat.checkSelfPermission(
-                        this,
-                        Manifest.permission.READ_EXTERNAL_STORAGE
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    list.add(Manifest.permission.READ_EXTERNAL_STORAGE)
-                }
-                if (ContextCompat.checkSelfPermission(
-                        this,
-                        Manifest.permission.WRITE_EXTERNAL_STORAGE
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    list.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                }
-                list.toTypedArray()
-            }
-            else -> emptyArray()
-        }
+        cameraAutoPromptAttempted = false
+        lastAutoPrivilegeGuideAtMs = 0L
+        requestNextMissingPrivilege(force = true)
     }
 
     private fun ensureServiceRunning() {

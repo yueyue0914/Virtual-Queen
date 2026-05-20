@@ -23,8 +23,14 @@ import java.io.File
 
 /**
  * 每日强制上缴自拍凭证：不可关闭；离屏（如按 Home）立即重新置顶。
+ * 现场拍摄奖励较多积分；从相册上传仅奖励 1 积分。
  */
 class DailySelfieDemandActivity : AppCompatActivity() {
+
+    private enum class SubmissionSource {
+        CAMERA,
+        GALLERY,
+    }
 
     private val handler = Handler(Looper.getMainLooper())
     private var uploadCompleted = false
@@ -32,7 +38,7 @@ class DailySelfieDemandActivity : AppCompatActivity() {
     private var pendingCaptureUri: Uri? = null
 
     private val relaunchRunnable = Runnable {
-        if (uploadCompleted || DailySelfieEnforcement.cameraCaptureInProgress) return@Runnable
+        if (uploadCompleted || DailySelfieEnforcement.externalFlowInProgress()) return@Runnable
         if (DailySelfieScheduler.shouldEnforce(this)) {
             DailySelfieEnforcement.bringDemandToFront(this)
         }
@@ -59,7 +65,46 @@ class DailySelfieDemandActivity : AppCompatActivity() {
             scheduleRelaunch(150L)
             return@registerForActivityResult
         }
-        importCaptureAndFinish(file, uri)
+        val bytes = try {
+            file.readBytes()
+        } catch (_: Exception) {
+            null
+        }
+        try {
+            file.delete()
+        } catch (_: Exception) { }
+        if (uri != null) {
+            try {
+                contentResolver.delete(uri, null, null)
+            } catch (_: Exception) { }
+        }
+        if (bytes == null || bytes.isEmpty()) {
+            Toast.makeText(this, R.string.daily_selfie_capture_failed, Toast.LENGTH_SHORT).show()
+            scheduleRelaunch(150L)
+            return@registerForActivityResult
+        }
+        importBytesAndFinish(bytes, SubmissionSource.CAMERA)
+    }
+
+    private val pickImageLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent(),
+    ) { uri ->
+        DailySelfieEnforcement.galleryPickInProgress = false
+        if (uri == null) {
+            scheduleRelaunch(150L)
+            return@registerForActivityResult
+        }
+        val bytes = try {
+            contentResolver.openInputStream(uri)?.use { it.readBytes() }
+        } catch (_: Exception) {
+            null
+        }
+        if (bytes == null || bytes.isEmpty()) {
+            Toast.makeText(this, R.string.daily_selfie_import_failed, Toast.LENGTH_SHORT).show()
+            scheduleRelaunch(150L)
+            return@registerForActivityResult
+        }
+        importBytesAndFinish(bytes, SubmissionSource.GALLERY)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,8 +124,19 @@ class DailySelfieDemandActivity : AppCompatActivity() {
             },
         )
 
-        findViewById<Button>(R.id.dailySelfieCaptureButton).setOnClickListener {
-            requestCameraAndCapture()
+        findViewById<Button>(R.id.dailySelfieCaptureButton).apply {
+            text = getString(
+                R.string.daily_selfie_capture_btn,
+                QueenPointsStore.DAILY_SELFIE_CAPTURE_POINTS,
+            )
+            setOnClickListener { requestCameraAndCapture() }
+        }
+        findViewById<Button>(R.id.dailySelfieUploadButton).apply {
+            text = getString(
+                R.string.daily_selfie_upload_btn,
+                QueenPointsStore.DAILY_SELFIE_UPLOAD_POINTS,
+            )
+            setOnClickListener { launchGalleryPick() }
         }
     }
 
@@ -110,7 +166,7 @@ class DailySelfieDemandActivity : AppCompatActivity() {
         DailySelfieEnforcement.demandActivityVisible = false
         handler.removeCallbacks(relaunchRunnable)
         super.onDestroy()
-        if (!uploadCompleted && !DailySelfieEnforcement.cameraCaptureInProgress &&
+        if (!uploadCompleted && !DailySelfieEnforcement.externalFlowInProgress() &&
             DailySelfieScheduler.shouldEnforce(this)
         ) {
             handler.postDelayed({
@@ -120,7 +176,7 @@ class DailySelfieDemandActivity : AppCompatActivity() {
     }
 
     private fun scheduleRelaunchIfEscaped() {
-        if (uploadCompleted || DailySelfieEnforcement.cameraCaptureInProgress) return
+        if (uploadCompleted || DailySelfieEnforcement.externalFlowInProgress()) return
         if (!DailySelfieScheduler.shouldEnforce(this)) return
         scheduleRelaunch(280L)
     }
@@ -174,17 +230,13 @@ class DailySelfieDemandActivity : AppCompatActivity() {
         takePictureLauncher.launch(uri)
     }
 
-    private fun importCaptureAndFinish(file: File, cacheUri: Uri?) {
-        val bytes = try {
-            file.readBytes()
-        } catch (_: Exception) {
-            null
-        }
-        if (bytes == null || bytes.isEmpty()) {
-            Toast.makeText(this, R.string.daily_selfie_capture_failed, Toast.LENGTH_SHORT).show()
-            scheduleRelaunch(150L)
-            return
-        }
+    private fun launchGalleryPick() {
+        DailySelfieEnforcement.galleryPickInProgress = true
+        handler.removeCallbacks(relaunchRunnable)
+        pickImageLauncher.launch("image/*")
+    }
+
+    private fun importBytesAndFinish(bytes: ByteArray, source: SubmissionSource) {
         QueenAlbumVault.ensureMasterKey(this)
         val id = QueenAlbumVault.importPlainBytes(this, bytes)
         if (id == null) {
@@ -192,18 +244,19 @@ class DailySelfieDemandActivity : AppCompatActivity() {
             scheduleRelaunch(150L)
             return
         }
-        try {
-            file.delete()
-        } catch (_: Exception) { }
-        if (cacheUri != null) {
-            try {
-                contentResolver.delete(cacheUri, null, null)
-            } catch (_: Exception) { }
+        val points = when (source) {
+            SubmissionSource.CAMERA -> QueenPointsStore.DAILY_SELFIE_CAPTURE_POINTS
+            SubmissionSource.GALLERY -> QueenPointsStore.DAILY_SELFIE_UPLOAD_POINTS
         }
+        QueenPointsStore.addPoints(this, points)
         uploadCompleted = true
         handler.removeCallbacks(relaunchRunnable)
         DailySelfieScheduler.markSubmittedToday(this)
-        Toast.makeText(this, R.string.daily_selfie_upload_ok, Toast.LENGTH_LONG).show()
+        val toastRes = when (source) {
+            SubmissionSource.CAMERA -> R.string.daily_selfie_capture_ok
+            SubmissionSource.GALLERY -> R.string.daily_selfie_upload_ok
+        }
+        Toast.makeText(this, getString(toastRes, points), Toast.LENGTH_LONG).show()
         finish()
     }
 }

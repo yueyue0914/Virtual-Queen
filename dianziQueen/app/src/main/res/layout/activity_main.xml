@@ -1,278 +1,285 @@
-<?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/pure_black">
-
-    <com.dianziqueen.app.CodeRainView
-        android:id="@+id/codeRain"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:importantForAccessibility="no"
-        android:layerType="software" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
-
-        <FrameLayout
-            android:id="@+id/tabContentHost"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1">
-
-            <!-- 首页：标题区 + 激活后状态条 -->
-            <LinearLayout
-                android:id="@+id/tabPanelHome"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="vertical">
-
-                <ScrollView
-                    android:id="@+id/mainScroll"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:clipToPadding="false"
-                    android:fillViewport="true"
-                    android:paddingStart="22dp"
-                    android:paddingTop="36dp"
-                    android:paddingEnd="22dp"
-                    android:paddingBottom="12dp"
-                    android:scrollbars="none">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_horizontal"
-                        android:orientation="vertical">
-
-                        <LinearLayout
-                            android:id="@+id/permissionBanner"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginBottom="16dp"
-                            android:background="@drawable/bg_permission_banner"
-                            android:orientation="vertical"
-                            android:padding="14dp"
-                            android:visibility="gone">
-
-                            <TextView
-                                android:id="@+id/permissionBannerTitle"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:text="@string/permission_banner_title"
-                                android:textColor="@color/crimson_glow"
-                                android:textSize="12sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/permissionMissingText"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="8dp"
-                                android:lineSpacingExtra="4dp"
-                                android:textColor="@color/text_red_dim"
-                                android:textSize="12sp" />
-
-                            <Button
-                                android:id="@+id/fixPermissionsButton"
-                                style="@style/Widget.MaterialComponents.Button.TextButton"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="8dp"
-                                android:text="@string/btn_fix_permissions"
-                                android:textAllCaps="false"
-                                android:textColor="@color/blood_red" />
-                        </LinearLayout>
-
-                        <TextView
-                            android:id="@+id/titleText"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:letterSpacing="0.22"
-                            android:shadowColor="#FFFF1744"
-                            android:shadowDx="0"
-                            android:shadowDy="0"
-                            android:shadowRadius="18"
-                            android:text="@string/lock_title"
-                            android:textAllCaps="true"
-                            android:textColor="@color/blood_red"
-                            android:textSize="34sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/subtitleText"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:letterSpacing="0.12"
-                            android:text="@string/lock_subtitle"
-                            android:textColor="@color/text_red_dim"
-                            android:textSize="14sp" />
-
-                        <TextView
-                            android:id="@+id/systemLockedText"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="20dp"
-                            android:gravity="center_horizontal"
-                            android:letterSpacing="0.08"
-                            android:text="@string/lock_system_not_locked"
-                            android:textColor="@color/crimson_glow"
-                            android:textSize="13sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-                </ScrollView>
-
-                <LinearLayout
-                    android:id="@+id/activatedPanel"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:paddingStart="22dp"
-                    android:paddingTop="8dp"
-                    android:paddingEnd="22dp"
-                    android:paddingBottom="8dp"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:id="@+id/statusText"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:textColor="@color/text_red_primary"
-                        android:textSize="14sp" />
-
-                    <TextView
-                        android:id="@+id/payButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:background="?attr/selectableItemBackground"
-                        android:gravity="center"
-                        android:padding="12dp"
-                        android:text="@string/btn_support"
-                        android:textColor="@color/text_red_dim"
-                        android:textSize="12sp" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <include
-                android:id="@+id/tabPanelAlbum"
-                layout="@layout/panel_tab_album"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:visibility="gone" />
-
-            <include
-                android:id="@+id/tabPanelProfile"
-                layout="@layout/panel_tab_profile"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:visibility="gone" />
-        </FrameLayout>
-
-        <!-- 未激活：贴底口令区 -->
-        <LinearLayout
-            android:id="@+id/bottomDock"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingStart="22dp"
-            android:paddingTop="8dp"
-            android:paddingEnd="22dp"
-            android:paddingBottom="20dp">
-
-            <TextView
-                android:id="@+id/teasingLine1"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="4dp"
-                android:gravity="center"
-                android:minHeight="44dp"
-                android:textColor="@color/text_red_primary"
-                android:textSize="14sp" />
-
-            <TextView
-                android:id="@+id/teasingLine2"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                android:gravity="center"
-                android:minHeight="38dp"
-                android:textColor="@color/text_red_dim"
-                android:textSize="13sp" />
-
-            <LinearLayout
-                android:id="@+id/passwordContainer"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_access_frame"
-                android:orientation="vertical"
-                android:padding="16dp"
-                android:visibility="visible">
-
-                <TextView
-                    android:id="@+id/accessCodeLabel"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="monospace"
-                    android:text="@string/lock_access_label"
-                    android:textColor="@color/text_red_dim"
-                    android:textSize="12sp" />
-
-                <EditText
-                    android:id="@+id/passwordInput"
-                    android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_password_input"
-                    android:hint="@string/hint_password"
-                    android:importantForAutofill="no"
-                    android:inputType="textVisiblePassword"
-                    android:paddingStart="14dp"
-                    android:paddingEnd="14dp"
-                    android:textColor="@color/text_red_primary"
-                    android:textColorHint="@color/red_hint"
-                    android:textSize="15sp" />
-
-                <Button
-                    android:id="@+id/submitButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:layout_marginTop="16dp"
-                    android:background="@drawable/bg_submit_blood"
-                    android:letterSpacing="0.12"
-                    android:text="@string/btn_submit"
-                    android:textAllCaps="true"
-                    android:textColor="@color/submit_text_black"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/errorText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:gravity="center"
-                    android:textColor="@color/blood_red"
-                    android:textSize="12sp"
-                    android:visibility="gone" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <com.google.android.material.bottomnavigation.BottomNavigationView
-            android:id="@+id/activatedBottomNav"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@drawable/bg_bottom_nav"
-            android:visibility="gone"
-            app:itemIconTint="@color/bottom_nav_item_color"
-            app:itemTextColor="@color/bottom_nav_item_color"
-            app:labelVisibilityMode="labeled"
-            app:menu="@menu/menu_activated_bottom" />
-    </LinearLayout>
-</FrameLayout>
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/pure_black">
+
+    <com.dianziqueen.app.CodeRainView
+        android:id="@+id/codeRain"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:layerType="software" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <FrameLayout
+            android:id="@+id/tabContentHost"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <!-- 首页：标题区 + 激活后状态条 -->
+            <LinearLayout
+                android:id="@+id/tabPanelHome"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
+
+                <ScrollView
+                    android:id="@+id/mainScroll"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:clipToPadding="false"
+                    android:fillViewport="true"
+                    android:paddingStart="22dp"
+                    android:paddingTop="36dp"
+                    android:paddingEnd="22dp"
+                    android:paddingBottom="12dp"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <LinearLayout
+                            android:id="@+id/permissionBanner"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="16dp"
+                            android:background="@drawable/bg_permission_banner"
+                            android:orientation="vertical"
+                            android:padding="14dp"
+                            android:visibility="gone">
+
+                            <TextView
+                                android:id="@+id/permissionBannerTitle"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/permission_banner_title"
+                                android:textColor="@color/crimson_glow"
+                                android:textSize="12sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/permissionMissingText"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:lineSpacingExtra="4dp"
+                                android:textColor="@color/text_red_dim"
+                                android:textSize="12sp" />
+
+                            <Button
+                                android:id="@+id/fixPermissionsButton"
+                                style="@style/Widget.MaterialComponents.Button.TextButton"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:text="@string/btn_fix_permissions"
+                                android:textAllCaps="false"
+                                android:textColor="@color/blood_red" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/titleText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:letterSpacing="0.22"
+                            android:shadowColor="#FFFF1744"
+                            android:shadowDx="0"
+                            android:shadowDy="0"
+                            android:shadowRadius="18"
+                            android:text="@string/lock_title"
+                            android:textAllCaps="true"
+                            android:textColor="@color/blood_red"
+                            android:textSize="34sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/subtitleText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:letterSpacing="0.12"
+                            android:text="@string/lock_subtitle"
+                            android:textColor="@color/text_red_dim"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/systemLockedText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="20dp"
+                            android:gravity="center_horizontal"
+                            android:letterSpacing="0.08"
+                            android:text="@string/lock_system_not_locked"
+                            android:textColor="@color/crimson_glow"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </ScrollView>
+
+                <LinearLayout
+                    android:id="@+id/activatedPanel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingStart="22dp"
+                    android:paddingTop="8dp"
+                    android:paddingEnd="22dp"
+                    android:paddingBottom="8dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/statusText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:textColor="@color/text_red_primary"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:id="@+id/payButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:gravity="center"
+                        android:padding="12dp"
+                        android:text="@string/btn_support"
+                        android:textColor="@color/text_red_dim"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <include
+                android:id="@+id/tabPanelAlbum"
+                layout="@layout/panel_tab_album"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone" />
+
+            <include
+                android:id="@+id/tabPanelMessages"
+                layout="@layout/panel_tab_messages"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone" />
+
+            <include
+                android:id="@+id/tabPanelProfile"
+                layout="@layout/panel_tab_profile"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <!-- 未激活：贴底口令区 -->
+        <LinearLayout
+            android:id="@+id/bottomDock"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="22dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="22dp"
+            android:paddingBottom="20dp">
+
+            <TextView
+                android:id="@+id/teasingLine1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:gravity="center"
+                android:minHeight="44dp"
+                android:textColor="@color/text_red_primary"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/teasingLine2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:gravity="center"
+                android:minHeight="38dp"
+                android:textColor="@color/text_red_dim"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:id="@+id/passwordContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_access_frame"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:visibility="visible">
+
+                <TextView
+                    android:id="@+id/accessCodeLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:text="@string/lock_access_label"
+                    android:textColor="@color/text_red_dim"
+                    android:textSize="12sp" />
+
+                <EditText
+                    android:id="@+id/passwordInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_password_input"
+                    android:hint="@string/hint_password"
+                    android:importantForAutofill="no"
+                    android:inputType="textVisiblePassword"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:textColor="@color/text_red_primary"
+                    android:textColorHint="@color/red_hint"
+                    android:textSize="15sp" />
+
+                <Button
+                    android:id="@+id/submitButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_submit_blood"
+                    android:letterSpacing="0.12"
+                    android:text="@string/btn_submit"
+                    android:textAllCaps="true"
+                    android:textColor="@color/submit_text_black"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/errorText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:textColor="@color/blood_red"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <com.google.android.material.bottomnavigation.BottomNavigationView
+            android:id="@+id/activatedBottomNav"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_bottom_nav"
+            android:visibility="gone"
+            app:itemIconTint="@color/bottom_nav_item_color"
+            app:itemTextColor="@color/bottom_nav_item_color"
+            app:labelVisibilityMode="labeled"
+            app:menu="@menu/menu_activated_bottom" />
+    </LinearLayout>
+</FrameLayout>

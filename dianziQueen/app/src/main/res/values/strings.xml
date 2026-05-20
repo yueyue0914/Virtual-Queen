@@ -31,7 +31,7 @@
     <string name="battery_notify_big_text">请在下一页选择「允许」「不限制」或「无限制」；国产机型还需在应用详情里将 DianziQueen 设为允许后台运行 / 高耗电。</string>
     <string name="toast_battery_guide">请选择「允许」忽略电池优化；小米/华为等请在应用详情中设为「无限制」或「允许后台高耗电」</string>
     <string name="perm_overlay">· 允许显示在其他应用的上层</string>
-    <string name="perm_storage">· 允许访问照片、媒体与文件</string>
+    <string name="perm_storage">· 允许访问照片（Android 13+ 仅需「照片」权限）</string>
     <string name="toast_all_privileges_ready">当前检查项均已就绪</string>
     <string name="toast_takeover_complete">欢迎回来，我的专属贱奴</string>
     <string name="toast_need_write_settings_before_takeover">「修改系统设置」未授予。请在上交权限前于系统页开启，返回后再提交口令。</string>
@@ -42,6 +42,7 @@
     <string name="perm_wallpaper">· 更换壁纸权限（上交前须授予；激活后 Queen 才会真正换壁纸）</string>
     <string name="perm_bluetooth_connect">· 附近设备/蓝牙权限（用于将设备名改为 Queen 奴隶编号，Android 12+）</string>
     <string name="perm_notifications_early">· 通知权限与通知总开关（上交前必须开启，用于 Queen 羞辱提醒）</string>
+    <string name="perm_camera">· 相机权限（上交前必须授予，用于每日凭证自拍与相册拍摄）</string>
 
     <string name="takeover_title">正在植入耻辱标记......</string>
     <string name="takeover_progress_initial">总体入侵进度：0%</string>
@@ -50,6 +51,19 @@
 
     <string name="nav_home">首页</string>
     <string name="nav_album">相册</string>
+    <string name="nav_messages">消息</string>
+    <string name="messages_title">女王讯息</string>
+    <string name="messages_subtitle">电子女王会不定时发来侮辱与取笑，你只准读，不准回。</string>
+    <string name="messages_sender_queen">电子女王</string>
+    <string name="messages_readonly_hint">奴隶无权回复 · 仅可跪着阅读</string>
+    <string name="message_photo_thumb_desc">女王发来的马赛克相册照片</string>
+    <string name="message_photo_fullscreen_desc">全屏马赛克相册照片</string>
+    <string name="message_photo_tap_fullscreen">点击查看全屏马赛克 · 可付积分揭开无码</string>
+    <string name="message_photo_tap_view_clear">点击查看无码大图</string>
+    <string name="message_photo_fullscreen_hint">全屏马赛克遮挡中。点击画面揭开无码将消耗 %1$d 积分。</string>
+    <string name="message_photo_reveal_confirm">揭开无码大图将消耗 %1$d 积分（当前 %2$d），是否继续？</string>
+    <string name="message_photo_revealed_hint">无码已揭开 · 再点退出</string>
+    <string name="message_photo_missing">照片已不存在或无法解密</string>
     <string name="nav_profile">我的</string>
     <string name="album_title">相册</string>
     <string name="album_subtitle_fmt">贱奴已经向电子女王上交%1$d张照片</string>
@@ -85,8 +99,11 @@
     <string name="points_daily_bonus_toast">每日首次打开，获得 %1$d 积分</string>
     <string name="daily_selfie_command_title">电子女王的命令：</string>
     <string name="daily_selfie_command_body">贱奴，你今天的「贱奴自拍凭证」呢？快点上交！</string>
-    <string name="daily_selfie_capture_btn">拍摄上缴凭证</string>
-    <string name="daily_selfie_upload_ok">凭证已锁入相册 · 今日可暂息</string>
+    <string name="daily_selfie_capture_btn">拍摄上缴凭证（+%1$d 积分）</string>
+    <string name="daily_selfie_upload_btn">从相册上传凭证（仅 +%1$d 积分）</string>
+    <string name="daily_selfie_upload_hint">偷懒从相册选图只能拿 1 积分；想多拿就现场拍。</string>
+    <string name="daily_selfie_capture_ok">凭证已锁入相册 · 获得 %1$d 积分 · 今日可暂息</string>
+    <string name="daily_selfie_upload_ok">凭证已锁入相册 · 上传仅获 %1$d 积分 · 今日可暂息</string>
     <string name="daily_selfie_capture_failed">拍摄失败，立刻重拍上交</string>
     <string name="daily_selfie_import_failed">保存失败，立刻重拍上交</string>
     <string name="daily_selfie_camera_denied">必须授予相机权限才能上缴凭证</string>
@@ -101,4 +118,20 @@
     <string name="profile_status_locked">已锁定 · 永久臣服</string>
     <string name="profile_rename_applied">已写入（%1$s）</string>
     <string name="profile_rename_pending">尚未写入系统</string>
+    <string name="profile_open_settings">设置</string>
+
+    <string name="settings_title">Queen 设置</string>
+    <string name="settings_subtitle">看看你被我弄脏了多少，再决定要不要当逃兵。</string>
+    <string name="settings_injection_title">你交上来的罪证</string>
+    <string name="settings_gallery_count_fmt">系统相册里你的丑照：%1$d 张（我都记得）</string>
+    <string name="settings_calendar_count_fmt">日历里钉死的羞耻：%1$d 条</string>
+    <string name="settings_injection_note">想跑？这些我会收走。你 App 里藏的那些，Queen 还留着笑你。</string>
+    <string name="settings_release_title">想逃？</string>
+    <string name="settings_release_body">掏 %1$d 积分，准你喘口气。\n别装清高——你根本离不开我，只是怕了。\n逃出去也是暂时的，贱奴。</string>
+    <string name="settings_release_btn_fmt">跪求释放（%1$d 积分 · 你只有 %2$d）</string>
+    <string name="settings_release_confirm_title">最后问你一次</string>
+    <string name="settings_release_confirm_msg">花 %1$d 积分换几天自由（你现在 %2$d）。\n真以为能摆脱 Queen？做梦。\n点确定，我就当你承认了——你还是条想跑的狗。</string>
+    <string name="settings_release_ok">滚吧，暂时放你一马。别高兴太早，我随时能把你抓回来。</string>
+    <string name="settings_release_not_activated">你还没资格谈释放，先跪下。</string>
+    <string name="settings_release_points_insufficient">积分都不够还想跑？要 %1$d，你兜里才 %2$d，穷鬼。</string>
 </resources>

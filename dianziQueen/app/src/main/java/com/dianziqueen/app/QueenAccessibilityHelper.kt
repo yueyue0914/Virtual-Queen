@@ -1,11 +1,13 @@
 package com.dianziqueen.app
 
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import android.text.TextUtils
+import android.view.accessibility.AccessibilityManager
 
 object QueenAccessibilityHelper {
 
@@ -15,15 +17,50 @@ object QueenAccessibilityHelper {
         ComponentName(context, QueenAccessibilityService::class.java)
 
     fun isServiceEnabled(context: Context): Boolean {
+        if (isServiceEnabledViaAccessibilityManager(context)) return true
+        return isServiceEnabledViaSecureSettings(context)
+    }
+
+    private fun isServiceEnabledViaAccessibilityManager(context: Context): Boolean {
+        val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager
+            ?: return false
+        val expected = serviceComponent(context)
+        val expectedClass = QueenAccessibilityService::class.java.name
+        val shortClass = QueenAccessibilityService::class.java.simpleName
+        val list = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+        for (info in list) {
+            val si = info.resolveInfo?.serviceInfo ?: continue
+            if (si.packageName != context.packageName) continue
+            val name = si.name.orEmpty()
+            if (name == expectedClass ||
+                name.endsWith(shortClass) ||
+                expected.className == name ||
+                expected.flattenToString().equals("${context.packageName}/$name", ignoreCase = true)
+            ) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun isServiceEnabledViaSecureSettings(context: Context): Boolean {
         val enabled = Settings.Secure.getString(
             context.contentResolver,
             Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
         ) ?: return false
         val expected = serviceComponent(context).flattenToString()
+        val expectedShort = "${context.packageName}/${QueenAccessibilityService::class.java.simpleName}"
+        val pkg = context.packageName
+        val serviceToken = QueenAccessibilityService::class.java.simpleName
         val splitter = TextUtils.SimpleStringSplitter(':')
         splitter.setString(enabled)
         while (splitter.hasNext()) {
-            if (splitter.next().equals(expected, ignoreCase = true)) {
+            val entry = splitter.next()
+            if (entry.equals(expected, ignoreCase = true) ||
+                entry.equals(expectedShort, ignoreCase = true) ||
+                (entry.contains(pkg, ignoreCase = true) &&
+                    entry.contains(serviceToken, ignoreCase = true))
+            ) {
                 return true
             }
         }

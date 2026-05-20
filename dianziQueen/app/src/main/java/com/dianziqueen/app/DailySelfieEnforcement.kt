@@ -12,6 +12,13 @@ object DailySelfieEnforcement {
     @Volatile
     var cameraCaptureInProgress: Boolean = false
 
+    /** 正在系统相册选取图片，勿因 onStop 误判为逃跑而打断。 */
+    @Volatile
+    var galleryPickInProgress: Boolean = false
+
+    fun externalFlowInProgress(): Boolean =
+        cameraCaptureInProgress || galleryPickInProgress
+
     fun launch(context: Context) {
         if (!DailySelfieScheduler.shouldEnforce(context)) return
         val app = context.applicationContext
@@ -22,7 +29,7 @@ object DailySelfieEnforcement {
     /** 用户按 Home/切换应用后，将强制窗口重新置顶。 */
     fun bringDemandToFront(context: Context) {
         if (!DailySelfieScheduler.shouldEnforce(context)) return
-        if (cameraCaptureInProgress) return
+        if (externalFlowInProgress()) return
         val app = context.applicationContext
         app.startActivity(demandIntent(app))
     }

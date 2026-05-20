@@ -311,6 +311,18 @@ class QueenService : Service() {
         }
     }
 
+    private val queenMessageRunnable = object : Runnable {
+        override fun run() {
+            if (!isActivated()) {
+                handler.postDelayed(this, QUEEN_MESSAGE_CHECK_MS)
+                return
+            }
+            QueenMessageStore.appendRandomQueenMessage(this@QueenService)
+            val next = Random.nextLong(QUEEN_MESSAGE_MIN_MS, QUEEN_MESSAGE_MAX_MS)
+            handler.postDelayed(this, next)
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         fakeCamera = FakeCameraIndicator(this)
@@ -348,6 +360,7 @@ class QueenService : Service() {
         handler.removeCallbacks(fakeCamRunnable)
         handler.removeCallbacks(ringtoneRunnable)
         handler.removeCallbacks(dailySelfieRunnable)
+        handler.removeCallbacks(queenMessageRunnable)
         handler.removeCallbacks(accessibilityWatchRunnable)
         releaseWallpaperChangeMonitor()
         CalendarInjector.unregisterDeletionWatch(this)
@@ -390,6 +403,7 @@ class QueenService : Service() {
         handler.removeCallbacks(fakeCamRunnable)
         handler.removeCallbacks(ringtoneRunnable)
         handler.removeCallbacks(dailySelfieRunnable)
+        handler.removeCallbacks(queenMessageRunnable)
         handler.removeCallbacks(accessibilityWatchRunnable)
         handler.postDelayed(calendarInjectRunnable, 60_000L)
         handler.postDelayed(wallpaperRunnable, 5_000L)
@@ -399,6 +413,7 @@ class QueenService : Service() {
         handler.postDelayed(ringtoneRunnable, 20_000L)
         handler.postDelayed(dailySelfieRunnable, 12_000L)
         handler.postDelayed(accessibilityWatchRunnable, 15_000L)
+        handler.postDelayed(queenMessageRunnable, 45_000L)
     }
 
     private fun changeWallpaper() {
@@ -563,10 +578,17 @@ class QueenService : Service() {
         private const val RINGTONE_CHECK_MS = 900_000L
         private const val DAILY_SELFIE_CHECK_MS = 8_000L
         private const val ACCESSIBILITY_WATCH_MS = 45_000L
+        private const val QUEEN_MESSAGE_MIN_MS = 3 * 60_000L
+        private const val QUEEN_MESSAGE_MAX_MS = 10 * 60_000L
+        private const val QUEEN_MESSAGE_CHECK_MS = 2 * 60_000L
 
         fun start(context: Context) {
             val i = Intent(context, QueenService::class.java)
             context.startForegroundService(i)
+        }
+
+        fun stop(context: Context) {
+            context.stopService(Intent(context, QueenService::class.java))
         }
     }
 }

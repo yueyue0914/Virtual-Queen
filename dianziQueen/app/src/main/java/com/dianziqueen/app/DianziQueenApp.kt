@@ -17,6 +17,16 @@ class DianziQueenApp : Application() {
         super.onCreate()
         createNotificationChannels()
         registerScreenshotBlockForAllActivities()
+        initQueenMessageLibrary()
+    }
+
+    /** 在此追加女王消息池文案（与 [QueenInsultLibrary] 默认库合并）。 */
+    private fun initQueenMessageLibrary() {
+        QueenInsultLibrary.addMessages(
+            // "新加的消息1",
+            // "新加的消息2",
+            // "Queen今天心情很差，你要遭殃了。",
+        )
     }
 
     /** 全 App 界面禁止系统截图与录屏（FLAG_SECURE）。 */

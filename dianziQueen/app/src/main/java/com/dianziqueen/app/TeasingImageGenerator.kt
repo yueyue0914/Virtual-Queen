@@ -234,9 +234,9 @@ class TeasingImageGenerator(private val context: Context) {
             drawCenteredMultiline(canvas, sub, width / 2f, height * 0.55f, 36f, 0xAA00E5FF.toInt())
             drawGlitch(canvas, width, height)
             val name = "queen_${System.currentTimeMillis()}"
-            val ok = saveBitmapToGallery(bitmap, name)
+            val uri = saveBitmapToGallery(bitmap, name)
             bitmap.recycle()
-            ok
+            uri != null
         } catch (e: Exception) {
             e.printStackTrace()
             false
@@ -284,7 +284,7 @@ class TeasingImageGenerator(private val context: Context) {
         }
     }
 
-    private fun saveBitmapToGallery(bitmap: Bitmap, baseName: String): Boolean {
+    private fun saveBitmapToGallery(bitmap: Bitmap, baseName: String): android.net.Uri? {
         val resolver = context.contentResolver
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, "$baseName.png")
@@ -296,21 +296,25 @@ class TeasingImageGenerator(private val context: Context) {
             }
         }
         val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        val uri = resolver.insert(collection, values) ?: return false
+        val uri = resolver.insert(collection, values) ?: return null
         return try {
             resolver.openOutputStream(uri).use { out ->
-                if (out == null) return false
-                if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) return false
+                if (out == null) return null
+                if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) return null
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 values.clear()
                 values.put(MediaStore.Images.Media.IS_PENDING, 0)
                 resolver.update(uri, values, null, null)
             }
-            true
+            QueenInjectionRegistry.recordGalleryUri(context, uri)
+            uri
         } catch (e: Exception) {
             e.printStackTrace()
-            false
+            try {
+                resolver.delete(uri, null, null)
+            } catch (_: Exception) { }
+            null
         }
     }
 }

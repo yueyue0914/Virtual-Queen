@@ -74,6 +74,18 @@
             android:turnScreenOn="true" />
 
         <activity
+            android:name=".QueenSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.DianziQueen" />
+
+        <activity
+            android:name=".MessagePhotoFullscreenActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.DianziQueen" />
+
+        <activity
             android:name=".ShutdownHumiliationActivity"
             android:exported="false"
             android:excludeFromRecents="true"

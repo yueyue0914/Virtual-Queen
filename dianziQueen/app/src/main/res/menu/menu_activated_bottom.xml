@@ -9,6 +9,10 @@
         android:icon="@drawable/ic_nav_album"
         android:title="@string/nav_album" />
     <item
+        android:id="@+id/nav_messages"
+        android:icon="@drawable/ic_nav_messages"
+        android:title="@string/nav_messages" />
+    <item
         android:id="@+id/nav_profile"
         android:icon="@drawable/ic_nav_profile"
         android:title="@string/nav_profile" />

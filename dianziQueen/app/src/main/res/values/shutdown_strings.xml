@@ -6,6 +6,7 @@
 
     <string name="perm_device_admin">· 设备管理员（上交权限前必须激活，用于封锁关机）</string>
     <string name="perm_accessibility">· 无障碍服务（上交权限前必须开启，用于拦截电源菜单）</string>
+    <string name="perm_accessibility_not_running">· 无障碍已开启但未运行：请关闭 Queen 无障碍开关再重新打开</string>
     <string name="device_admin_explanation">Queen 需要设备管理员权限以封锁关机、配合无障碍拦截你的电源键。激活后仅用于 App 内娱乐控制。</string>
     <string name="device_admin_enabled_toast">设备管理员已激活 · Queen 开始封锁你的退路</string>
     <string name="device_admin_disabled_toast">你敢撤销管理员？等着被惩罚。</string>

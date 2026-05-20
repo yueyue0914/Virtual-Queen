@@ -126,6 +126,60 @@ object QueenWallpaper {
         }
     }
 
+    /** 暂时释放：大字壁纸「你自由了，暂时的。」 */
+    fun applyTemporaryFreedomWallpaper(context: Context) {
+        val wm = WallpaperManager.getInstance(context)
+        val width = wm.desiredMinimumWidth.coerceAtLeast(720)
+        val height = wm.desiredMinimumHeight.coerceAtLeast(1280)
+        val bmp = freedomWallpaperBitmap(width, height)
+        try {
+            context.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(Prefs.WE_SET_WALLPAPER, true)
+                .apply()
+            applyWallpaper(context, bmp)
+        } finally {
+            bmp.recycle()
+        }
+    }
+
+    private fun freedomWallpaperBitmap(width: Int, height: Int): Bitmap {
+        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                0f,
+                0f,
+                width.toFloat(),
+                height.toFloat(),
+                intArrayOf(0xFF0D1B2A.toInt(), 0xFF1B263B.toInt(), 0xFF415A77.toInt()),
+                floatArrayOf(0f, 0.5f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bg)
+        val line1 = "你自由了，"
+        val line2 = "暂时的。"
+        val size = width * 0.11f
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFFFFFFFF.toInt()
+            textSize = size
+            textAlign = Paint.Align.CENTER
+            isFakeBoldText = true
+            setShadowLayer(size * 0.06f, 0f, size * 0.04f, 0xAA000000.toInt())
+        }
+        val cx = width / 2f
+        val y1 = height * 0.42f
+        val y2 = y1 + size * 1.25f
+        canvas.drawText(line1, cx, y1, paint)
+        canvas.drawText(line2, cx, y2, paint)
+        paint.textSize = width * 0.028f
+        paint.color = 0xCCB0BEC5.toInt()
+        paint.isFakeBoldText = false
+        canvas.drawText("DIANZI QUEEN · TEMPORARY RELEASE", cx, height * 0.58f, paint)
+        return bmp
+    }
+
     /** 标记为本应用设置壁纸后，随机 raw 或程序生成并应用（供定时任务与壁纸监听共用）。 */
     fun forceQueenWallpaper(context: Context) {
         try {

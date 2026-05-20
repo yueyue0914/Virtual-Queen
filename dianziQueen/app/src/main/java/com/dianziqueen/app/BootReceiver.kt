@@ -38,4 +38,6 @@ object Prefs {
     const val QUEEN_DAILY_SELFIE_SCHEDULE_DAY = "queen_daily_selfie_schedule_day"
     const val QUEEN_DAILY_SELFIE_TRIGGER_AT = "queen_daily_selfie_trigger_at"
     const val QUEEN_DAILY_SELFIE_SUBMITTED_DAY = "queen_daily_selfie_submitted_day"
+    /** 消息分页上次已读时间戳（毫秒）；晚于此时间的消息计为未读。 */
+    const val QUEEN_MESSAGES_LAST_READ_TS = "queen_messages_last_read_ts"
 }

@@ -145,5 +145,16 @@
                 android:textColor="@color/text_red_primary"
                 android:textSize="14sp" />
         </LinearLayout>
+
+        <Button
+            android:id="@+id/profileSettingsButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/bg_access_frame"
+            android:padding="14dp"
+            android:text="@string/profile_open_settings"
+            android:textColor="@color/text_red_primary"
+            android:textStyle="bold" />
     </LinearLayout>
 </ScrollView>
