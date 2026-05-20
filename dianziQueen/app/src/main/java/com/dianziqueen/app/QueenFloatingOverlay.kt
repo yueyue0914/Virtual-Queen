@@ -3,6 +3,7 @@ package com.dianziqueen.app
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
@@ -20,14 +21,15 @@ import kotlin.math.abs
 import kotlin.random.Random
 
 /**
- * 全局半透明悬浮女王：可拖动、随机台词、点击弹出快捷菜单。
+ * 全局半透明悬浮女王（对应设计稿中的 FloatingQueenWindow）。
+ * 可拖动、随机气泡台词、点击菜单；由 [QueenService] 在激活且已授权悬浮窗时拉起。
  */
-class QueenFloatingOverlay(context: Context) {
+object QueenFloatingOverlay {
 
-    private val app = context.applicationContext
     private val handler = Handler(Looper.getMainLooper())
-    private val prefs = app.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
-    private val touchSlop = (8 * app.resources.displayMetrics.density).toInt()
+    private var appContext: Context? = null
+    private val touchSlop: Int
+        get() = (8 * (appContext?.resources?.displayMetrics?.density ?: 1f)).toInt()
 
     private var rootView: View? = null
     private var layoutParams: WindowManager.LayoutParams? = null
@@ -47,6 +49,9 @@ class QueenFloatingOverlay(context: Context) {
     private var touchStartRawY = 0f
     private var dragging = false
 
+    private val prefs
+        get() = appContext?.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+
     private val hideBubbleRunnable = Runnable { hideSpeechBubble() }
     private val randomTauntRunnable = object : Runnable {
         override fun run() {
@@ -59,17 +64,25 @@ class QueenFloatingOverlay(context: Context) {
         }
     }
 
-    fun ensureShown() {
+    fun ensureShown(context: Context) {
+        appContext = context.applicationContext
         if (!isActivated()) {
             hide()
             return
         }
-        if (!Settings.canDrawOverlays(app)) {
+        if (!Settings.canDrawOverlays(appContext!!)) {
             hide()
             return
         }
-        if (isShowing) return
+        if (isShowing && rootView?.isAttachedToWindow == true) {
+            refreshAppearance()
+            return
+        }
+        if (isShowing) {
+            hide()
+        }
         try {
+            val app = appContext!!
             val wm = ContextCompat.getSystemService(app, WindowManager::class.java) ?: return
             val inflater = LayoutInflater.from(app)
             val root = inflater.inflate(R.layout.overlay_queen_floating, null)
@@ -86,14 +99,19 @@ class QueenFloatingOverlay(context: Context) {
             setupAvatarTouch(avatar, wm, root)
             setupMenuActions(root)
 
-            val type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            }
             val params = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 type,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_SECURE,
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT,
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
@@ -129,7 +147,9 @@ class QueenFloatingOverlay(context: Context) {
         menuVisible = false
         try {
             val wm = windowManager
-                ?: ContextCompat.getSystemService(app, WindowManager::class.java)
+                ?: appContext?.let {
+                    ContextCompat.getSystemService(it, WindowManager::class.java)
+                }
             rootView?.let { v ->
                 try {
                     wm?.removeView(v)
@@ -146,6 +166,12 @@ class QueenFloatingOverlay(context: Context) {
             menuPanel = null
             isShowing = false
         }
+    }
+
+    fun refreshAppearance() {
+        val avatar = avatarView ?: return
+        applyAvatarBase(avatar)
+        currentMood.applyAvatar(avatar, avatarStyle())
     }
 
     private fun setupAvatarTouch(avatar: ImageView, wm: WindowManager, root: View) {
@@ -184,7 +210,7 @@ class QueenFloatingOverlay(context: Context) {
                         savePosition(params.x, params.y)
                     } else {
                         toggleMenu()
-                        QueenVibratorHelper.lightTap(app)
+                        appContext?.let { QueenVibratorHelper.lightTap(it) }
                     }
                     dragging = false
                     true
@@ -195,24 +221,25 @@ class QueenFloatingOverlay(context: Context) {
     }
 
     private fun setupMenuActions(root: View) {
+        val app = appContext ?: return
         root.findViewById<TextView>(R.id.queenMenuConfess).setOnClickListener {
-            onConfess()
+            onConfess(app)
             setMenuVisible(false)
         }
         root.findViewById<TextView>(R.id.queenMenuDaily).setOnClickListener {
-            onDailyTask()
+            onDailyTask(app)
             setMenuVisible(false)
         }
         root.findViewById<TextView>(R.id.queenMenuPunish).setOnClickListener {
-            onPunishment()
+            onPunishment(app)
             setMenuVisible(false)
         }
         root.findViewById<TextView>(R.id.queenMenuSelfie).setOnClickListener {
-            onSelfieUpload()
+            onSelfieUpload(app)
             setMenuVisible(false)
         }
         root.findViewById<TextView>(R.id.queenMenuMessages).setOnClickListener {
-            openMainTab(messages = true)
+            openMainTab(app, messages = true)
             setMenuVisible(false)
         }
         root.findViewById<TextView>(R.id.queenMenuDismiss).setOnClickListener {
@@ -241,7 +268,7 @@ class QueenFloatingOverlay(context: Context) {
         } catch (_: Exception) { }
     }
 
-    private fun onConfess() {
+    private fun onConfess(app: Context) {
         val insult = QueenInsultLibrary.getRandom().orEmpty()
         if (insult.isNotEmpty()) {
             QueenMessageStore.appendQueenMessage(app, "【认罪】$insult")
@@ -249,7 +276,7 @@ class QueenFloatingOverlay(context: Context) {
         showTaunt(QueenFloatingMood.COLD_SMILE, QueenFloatingPhraseLibrary.confessionReply())
     }
 
-    private fun onDailyTask() {
+    private fun onDailyTask(app: Context) {
         if (DailySelfieScheduler.shouldEnforce(app)) {
             DailySelfieEnforcement.launch(app)
             showTaunt(QueenFloatingMood.COMMAND, app.getString(R.string.queen_float_daily_enforced))
@@ -261,22 +288,22 @@ class QueenFloatingOverlay(context: Context) {
         }
     }
 
-    private fun onPunishment() {
+    private fun onPunishment(app: Context) {
         QueenVibratorHelper.punish(app)
         showTaunt(QueenFloatingMood.ANGRY, QueenFloatingPhraseLibrary.punishmentTaunt())
     }
 
-    private fun onSelfieUpload() {
+    private fun onSelfieUpload(app: Context) {
         if (DailySelfieScheduler.shouldEnforce(app)) {
             DailySelfieEnforcement.bringDemandToFront(app)
         } else {
-            openMainTab(album = true)
+            openMainTab(app, album = true)
             Toast.makeText(app, R.string.queen_float_selfie_to_album, Toast.LENGTH_SHORT).show()
         }
         showTaunt(QueenFloatingMood.EXCITED, app.getString(R.string.queen_float_selfie_go))
     }
 
-    private fun openMainTab(messages: Boolean = false, album: Boolean = false) {
+    private fun openMainTab(app: Context, messages: Boolean = false, album: Boolean = false) {
         val intent = Intent(app, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -285,13 +312,6 @@ class QueenFloatingOverlay(context: Context) {
             if (album) putExtra(MainActivity.EXTRA_OPEN_ALBUM, true)
         }
         app.startActivity(intent)
-    }
-
-    /** 设置页切换头像后刷新当前悬浮窗（若正在显示）。 */
-    fun refreshAppearance() {
-        val avatar = avatarView ?: return
-        applyAvatarBase(avatar)
-        currentMood.applyAvatar(avatar, avatarStyle())
     }
 
     fun showTaunt(mood: QueenFloatingMood, text: String) {
@@ -318,10 +338,14 @@ class QueenFloatingOverlay(context: Context) {
     }
 
     private fun loadSavedPosition(): Pair<Int, Int> {
-        if (prefs.contains(Prefs.QUEEN_FLOAT_X) && prefs.contains(Prefs.QUEEN_FLOAT_Y)) {
-            return prefs.getInt(Prefs.QUEEN_FLOAT_X, 0) to prefs.getInt(Prefs.QUEEN_FLOAT_Y, 0)
+        val p = prefs
+        val app = appContext
+        if (p != null && app != null &&
+            p.contains(Prefs.QUEEN_FLOAT_X) && p.contains(Prefs.QUEEN_FLOAT_Y)
+        ) {
+            return p.getInt(Prefs.QUEEN_FLOAT_X, 0) to p.getInt(Prefs.QUEEN_FLOAT_Y, 0)
         }
-        val dm = app.resources.displayMetrics
+        val dm = app?.resources?.displayMetrics ?: return 0 to 0
         val size = (72 * dm.density).toInt()
         val margin = (16 * dm.density).toInt()
         val x = dm.widthPixels - size - margin
@@ -330,14 +354,14 @@ class QueenFloatingOverlay(context: Context) {
     }
 
     private fun savePosition(x: Int, y: Int) {
-        prefs.edit()
-            .putInt(Prefs.QUEEN_FLOAT_X, x)
-            .putInt(Prefs.QUEEN_FLOAT_Y, y)
-            .apply()
+        prefs?.edit()
+            ?.putInt(Prefs.QUEEN_FLOAT_X, x)
+            ?.putInt(Prefs.QUEEN_FLOAT_Y, y)
+            ?.apply()
     }
 
     private fun clampToScreen(params: WindowManager.LayoutParams) {
-        val dm = app.resources.displayMetrics
+        val dm = appContext?.resources?.displayMetrics ?: return
         val root = rootView ?: return
         val maxW = root.width.coerceAtLeast((80 * dm.density).toInt())
         val maxH = root.height.coerceAtLeast((80 * dm.density).toInt())
@@ -347,17 +371,17 @@ class QueenFloatingOverlay(context: Context) {
     }
 
     private fun isActivated(): Boolean =
-        prefs.getBoolean(Prefs.ACTIVATED, false)
+        prefs?.getBoolean(Prefs.ACTIVATED, false) == true
 
-    private fun avatarStyle(): QueenFloatingAvatarStyle =
-        QueenFloatingAvatarStyle.current(app)
+    private fun avatarStyle(): QueenFloatingAvatarStyle {
+        val app = appContext ?: return QueenFloatingAvatarStyle.DEFAULT
+        return QueenFloatingAvatarStyle.current(app)
+    }
 
     private fun applyAvatarBase(avatar: ImageView) {
         avatarStyle().applyTo(avatar)
     }
 
-    companion object {
-        private const val RANDOM_TAUNT_MIN_MS = 45_000L
-        private const val RANDOM_TAUNT_MAX_MS = 100_000L
-    }
+    private const val RANDOM_TAUNT_MIN_MS = 45_000L
+    private const val RANDOM_TAUNT_MAX_MS = 100_000L
 }

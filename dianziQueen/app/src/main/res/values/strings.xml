@@ -111,6 +111,7 @@
     <string name="profile_subtitle">你已登记在 Queen 的奴隶名册中</string>
     <string name="profile_label_slave">奴隶编号</string>
     <string name="profile_label_device_name">登记名</string>
+    <string name="queen_device_name_secure_skip_toast">Queen已标记此设备（名称修改需要系统权限）</string>
     <string name="profile_label_model">设备型号</string>
     <string name="profile_label_status">臣服状态</string>
     <string name="profile_label_rename">设备更名</string>

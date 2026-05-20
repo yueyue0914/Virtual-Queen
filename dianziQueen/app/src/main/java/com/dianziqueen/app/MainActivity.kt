@@ -423,6 +423,7 @@ class MainActivity : AppCompatActivity() {
         refreshCodeRainPhrases()
         updatePrivilegeUi()
         if (prefs.getBoolean(Prefs.ACTIVATED, false)) {
+            ensureServiceRunning()
             if (!passDailySelfieGate()) return
             if (activatedPanel.visibility != View.VISIBLE) {
                 showActivatedState()
@@ -438,7 +439,6 @@ class MainActivity : AppCompatActivity() {
                 ).show()
                 refreshProfilePanel()
             }
-            ensureServiceRunning()
             ensureCalendarInjected()
             QueenDeviceAdminHelper.applyQueenPolicies(this)
             tryApplyQueenDeviceName()

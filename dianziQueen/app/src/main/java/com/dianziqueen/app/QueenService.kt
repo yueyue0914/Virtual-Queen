@@ -21,7 +21,6 @@ class QueenService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var fakeCamera: FakeCameraIndicator
-    private lateinit var floatingQueen: QueenFloatingOverlay
     private lateinit var imageGen: TeasingImageGenerator
     private var notificationId = 2000
 
@@ -327,7 +326,6 @@ class QueenService : Service() {
     override fun onCreate() {
         super.onCreate()
         fakeCamera = FakeCameraIndicator(this)
-        floatingQueen = QueenFloatingOverlay(this)
         imageGen = TeasingImageGenerator(this)
     }
 
@@ -368,17 +366,15 @@ class QueenService : Service() {
         releaseWallpaperChangeMonitor()
         CalendarInjector.unregisterDeletionWatch(this)
         fakeCamera.hideDot()
-        floatingQueen.hide()
+        QueenFloatingOverlay.hide()
         super.onDestroy()
     }
 
     private fun refreshFloatingQueen() {
-        if (!::floatingQueen.isInitialized) return
         if (isActivated() && Settings.canDrawOverlays(this)) {
-            floatingQueen.refreshAppearance()
-            floatingQueen.ensureShown()
+            QueenFloatingOverlay.ensureShown(this)
         } else {
-            floatingQueen.hide()
+            QueenFloatingOverlay.hide()
         }
     }
 

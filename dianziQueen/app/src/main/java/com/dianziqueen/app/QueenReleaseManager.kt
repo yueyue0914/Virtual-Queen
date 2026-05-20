@@ -48,7 +48,7 @@ object QueenReleaseManager {
         DailySelfieScheduler.cancelAlarm(context)
         QueenAccessibilityHelper.cancelAccessibilityNotification(context)
         QueenBatteryHelper.cancelBatteryNotification(context)
-        QueenFloatingOverlay(context).hide()
+        QueenFloatingOverlay.hide()
         QueenService.stop(context)
     }
 }
