@@ -80,6 +80,12 @@
             android:theme="@style/Theme.DianziQueen" />
 
         <activity
+            android:name=".PermissionCheckActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.DianziQueen" />
+
+        <activity
             android:name=".MessagePhotoFullscreenActivity"
             android:exported="false"
             android:screenOrientation="portrait"

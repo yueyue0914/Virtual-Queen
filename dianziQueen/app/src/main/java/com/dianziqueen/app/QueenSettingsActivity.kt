@@ -61,6 +61,9 @@ class QueenSettingsActivity : AppCompatActivity() {
         QueenFloatingAvatarStyle.NVW3.applyTo(findViewById(R.id.settingsFloatPreviewNvw3))
 
         releaseButton.setOnClickListener { confirmAndRelease() }
+        findViewById<Button>(R.id.settingsPermCheckButton).setOnClickListener {
+            startActivity(PermissionCheckActivity.createIntent(this))
+        }
         refreshStats()
         refreshFloatAvatarSelectionUi()
         refreshHonorificSection()

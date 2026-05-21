@@ -290,6 +290,42 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:text="@string/perm_check_title"
+                android:textColor="@color/text_red_primary"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/perm_check_subtitle"
+                android:textColor="@color/text_red_dim"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/settingsPermCheckButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_submit_blood"
+                android:text="@string/settings_perm_check_btn"
+                android:textAllCaps="false"
+                android:textColor="@color/submit_text_black"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/bg_access_frame"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:text="@string/settings_release_title"
                 android:textColor="@color/crimson_glow"
                 android:textSize="16sp"

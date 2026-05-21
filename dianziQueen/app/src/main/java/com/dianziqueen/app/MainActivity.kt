@@ -193,6 +193,7 @@ class MainActivity : AppCompatActivity() {
         if (grants[Manifest.permission.BLUETOOTH_CONNECT] == true &&
             prefs.getBoolean(Prefs.ACTIVATED, false)
         ) {
+            QueenDeviceNameHelper.clearRenameSkippedForRetry(this)
             tryApplyQueenDeviceName()
         }
         handler.postDelayed({ continuePrivilegeAuditAfterRuntimeDialog() }, 320L)
@@ -461,7 +462,7 @@ class MainActivity : AppCompatActivity() {
             refreshMessagesUnreadBadge()
             schedulePrivilegeAuditOnAppOpen()
             if (!FloatingWindowPermissionHelper.hasPermission(this)) {
-                DomesticPermissionGuide.maybeShowOnResume(this)
+                DomesticRomGuide.maybeShowOnResume(this)
             }
         } else {
             schedulePrivilegeAuditOnAppOpen()
@@ -895,17 +896,12 @@ class MainActivity : AppCompatActivity() {
     private fun requestOverlayPermission() {
         if (QueenPrivilegeAuditor.canDrawOverlays(this)) return
         markAutoPrivilegeGuideLaunched()
-        DomesticPermissionGuide.showStrongGuideIfNeeded(this)
+        DomesticRomGuide.showGuideIfNeeded(this)
     }
 
-    /** 我的页：悬浮窗权限自检，一键跳转设置。 */
+    /** 我的页：Queen 权限自检页。 */
     private fun openOverlayPrivilegeSelfCheck() {
-        if (FloatingWindowPermissionHelper.hasPermission(this)) {
-            Toast.makeText(this, R.string.overlay_already_granted, Toast.LENGTH_SHORT).show()
-            QueenService.start(this)
-        } else {
-            DomesticPermissionGuide.showStrongGuide(this)
-        }
+        startActivity(PermissionCheckActivity.createIntent(this))
     }
 
     private fun canWriteSystemSettings(): Boolean =
@@ -913,6 +909,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun tryApplyQueenDeviceName() {
         if (runtimePermissionDialogOpen) return
+        if (prefs.getBoolean(Prefs.QUEEN_DEVICE_NAME_APPLIED, false)) return
+        if (prefs.getBoolean(Prefs.QUEEN_DEVICE_NAME_RENAME_SKIPPED, false)) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             !QueenDeviceNameHelper.hasBluetoothConnectPermission(this)
         ) {
@@ -1062,7 +1060,7 @@ class MainActivity : AppCompatActivity() {
         ensureCalendarInjected()
         tryApplyQueenDeviceName()
         updatePrivilegeUi()
-        DomesticPermissionGuide.showStrongGuideIfNeeded(this)
+        DomesticRomGuide.showGuideIfNeeded(this)
         UninstallGuard.enableProtection(this)
     }
 

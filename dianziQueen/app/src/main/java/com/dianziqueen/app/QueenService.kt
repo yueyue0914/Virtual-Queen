@@ -376,7 +376,7 @@ class QueenService : Service() {
         } else {
             QueenFloatingOverlay.hide()
             if (isActivated() && !FloatingWindowPermissionHelper.hasPermission(this)) {
-                DomesticPermissionGuide.markPendingFromBackground(this)
+                DomesticRomGuide.markPendingFromBackground(this)
             }
         }
     }

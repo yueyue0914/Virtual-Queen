@@ -31,6 +31,10 @@ object Prefs {
     const val QUEEN_SLAVE_NUMBER = "queen_slave_number"
     const val QUEEN_DEVICE_NAME_APPLIED = "queen_device_name_applied"
     const val QUEEN_DEVICE_NAME_METHOD = "queen_device_name_method"
+    /** 更名渠道均失败且已提示用户，避免 onResume 反复弹 Toast。 */
+    const val QUEEN_DEVICE_NAME_RENAME_SKIPPED = "queen_device_name_rename_skipped"
+    /** 「已标记此设备」Toast 是否已展示过。 */
+    const val QUEEN_DEVICE_NAME_MARK_TOAST_SHOWN = "queen_device_name_mark_toast_shown"
     const val QUEEN_POINTS = "queen_points"
     /** 首次激活后是否已发放默认积分 */
     const val QUEEN_POINTS_ACTIVATION_BONUS = "queen_points_activation_bonus"

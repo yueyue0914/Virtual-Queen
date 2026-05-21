@@ -52,12 +52,13 @@ class AlbumTabController(
     private val thumbCache = android.util.LruCache<String, Bitmap>(24)
 
     private var pendingCaptureUri: Uri? = null
-    private val gallerySourceEraser = QueenGallerySourceEraser.Helper(activity)
+    private val photoDeleteHelper = PhotoDeleteHelper.Helper(activity)
 
     private val pickImageLauncher = activity.registerForActivityResult(
-        ActivityResultContracts.GetContent(),
+        ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri == null) return@registerForActivityResult
+        PhotoDeleteHelper.takePersistableAccess(activity, uri)
         importFromUri(uri, eraseGallerySource = true)
     }
 
@@ -120,7 +121,7 @@ class AlbumTabController(
 
     private fun showAddPhotoDialog() {
         val labels = mutableListOf(activity.getString(R.string.album_add_pick))
-        val actions = mutableListOf<() -> Unit>({ pickImageLauncher.launch("image/*") })
+        val actions = mutableListOf<() -> Unit>({ pickImageLauncher.launch(arrayOf("image/*")) })
         if (isCameraCaptureAvailable()) {
             labels.add(activity.getString(R.string.album_add_camera))
             actions.add { requestCameraAndCapture() }
@@ -199,12 +200,22 @@ class AlbumTabController(
             Toast.makeText(activity, R.string.album_import_failed, Toast.LENGTH_SHORT).show()
             return
         }
-        if (eraseGallerySource) {
-            gallerySourceEraser.eraseAfterVaultImport(uri)
-        }
         preloadThumbnail(id)
         refreshGrid()
-        Toast.makeText(activity, R.string.album_import_ok, Toast.LENGTH_SHORT).show()
+        if (eraseGallerySource) {
+            photoDeleteHelper.deleteAfterVaultImport(uri) { deleted ->
+                activity.runOnUiThread {
+                    val msg = if (deleted) {
+                        R.string.album_import_ok_deleted
+                    } else {
+                        R.string.album_import_delete_failed
+                    }
+                    Toast.makeText(activity, msg, Toast.LENGTH_LONG).show()
+                }
+            }
+        } else {
+            Toast.makeText(activity, R.string.album_import_ok, Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun loadThumbnail(id: String): Bitmap? {

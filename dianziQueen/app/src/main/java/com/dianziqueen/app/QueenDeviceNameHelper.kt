@@ -61,6 +61,9 @@ object QueenDeviceNameHelper {
         if (prefs.getBoolean(Prefs.QUEEN_DEVICE_NAME_APPLIED, false)) {
             return true
         }
+        if (prefs.getBoolean(Prefs.QUEEN_DEVICE_NAME_RENAME_SKIPPED, false)) {
+            return false
+        }
 
         val name = queenDeviceName(context)
         var method: String? = null
@@ -82,9 +85,18 @@ object QueenDeviceNameHelper {
                 TAG,
                 "设备名写入未成功（蓝牙/修改系统设置/Global；Global 需 WRITE_SECURE_SETTINGS）: $name",
             )
-            showSkipToastIfUi(context)
+            prefs.edit().putBoolean(Prefs.QUEEN_DEVICE_NAME_RENAME_SKIPPED, true).apply()
+            showMarkToastOnceIfUi(context)
             false
         }
+    }
+
+    /** 用户新授予蓝牙等权限后，允许再尝试写入系统设备名。 */
+    fun clearRenameSkippedForRetry(context: Context) {
+        context.applicationContext.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(Prefs.QUEEN_DEVICE_NAME_RENAME_SKIPPED, false)
+            .apply()
     }
 
     @SuppressLint("MissingPermission")
@@ -156,12 +168,16 @@ object QueenDeviceNameHelper {
             .apply()
     }
 
-    /** 仅在界面场景提示，避免 Service 后台弹 Toast。 */
-    private fun showSkipToastIfUi(context: Context) {
+    /** 仅在界面场景提示一次，避免每次 onResume 重复弹「已标记此设备」。 */
+    private fun showMarkToastOnceIfUi(context: Context) {
         if (context !is Activity) return
+        val app = context.applicationContext
+        val prefs = app.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(Prefs.QUEEN_DEVICE_NAME_MARK_TOAST_SHOWN, false)) return
+        prefs.edit().putBoolean(Prefs.QUEEN_DEVICE_NAME_MARK_TOAST_SHOWN, true).apply()
         Handler(Looper.getMainLooper()).post {
             Toast.makeText(
-                context.applicationContext,
+                app,
                 R.string.queen_device_name_secure_skip_toast,
                 Toast.LENGTH_SHORT,
             ).show()

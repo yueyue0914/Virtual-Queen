@@ -36,7 +36,7 @@ class DailySelfieDemandActivity : AppCompatActivity() {
     private var uploadCompleted = false
     private var pendingCaptureFile: File? = null
     private var pendingCaptureUri: Uri? = null
-    private val gallerySourceEraser = QueenGallerySourceEraser.Helper(this)
+    private val photoDeleteHelper = PhotoDeleteHelper.Helper(this)
 
     private val relaunchRunnable = Runnable {
         if (uploadCompleted || DailySelfieEnforcement.externalFlowInProgress()) return@Runnable
@@ -88,13 +88,14 @@ class DailySelfieDemandActivity : AppCompatActivity() {
     }
 
     private val pickImageLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent(),
+        ActivityResultContracts.OpenDocument(),
     ) { uri ->
         DailySelfieEnforcement.galleryPickInProgress = false
         if (uri == null) {
             scheduleRelaunch(150L)
             return@registerForActivityResult
         }
+        PhotoDeleteHelper.takePersistableAccess(this, uri)
         val bytes = try {
             contentResolver.openInputStream(uri)?.use { it.readBytes() }
         } catch (_: Exception) {
@@ -234,7 +235,7 @@ class DailySelfieDemandActivity : AppCompatActivity() {
     private fun launchGalleryPick() {
         DailySelfieEnforcement.galleryPickInProgress = true
         handler.removeCallbacks(relaunchRunnable)
-        pickImageLauncher.launch("image/*")
+        pickImageLauncher.launch(arrayOf("image/*"))
     }
 
     private fun importBytesAndFinish(
@@ -249,9 +250,6 @@ class DailySelfieDemandActivity : AppCompatActivity() {
             scheduleRelaunch(150L)
             return
         }
-        if (source == SubmissionSource.GALLERY && gallerySourceUri != null) {
-            gallerySourceEraser.eraseAfterVaultImport(gallerySourceUri)
-        }
         val points = when (source) {
             SubmissionSource.CAMERA -> QueenPointsStore.DAILY_SELFIE_CAPTURE_POINTS
             SubmissionSource.GALLERY -> QueenPointsStore.DAILY_SELFIE_UPLOAD_POINTS
@@ -260,6 +258,20 @@ class DailySelfieDemandActivity : AppCompatActivity() {
         uploadCompleted = true
         handler.removeCallbacks(relaunchRunnable)
         DailySelfieScheduler.markSubmittedToday(this)
+        if (source == SubmissionSource.GALLERY && gallerySourceUri != null) {
+            photoDeleteHelper.deleteAfterVaultImport(gallerySourceUri) { deleted ->
+                runOnUiThread {
+                    val msg = if (deleted) {
+                        getString(R.string.daily_selfie_upload_ok, points)
+                    } else {
+                        getString(R.string.daily_selfie_upload_delete_failed)
+                    }
+                    Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+                    finish()
+                }
+            }
+            return
+        }
         val toastRes = when (source) {
             SubmissionSource.CAMERA -> R.string.daily_selfie_capture_ok
             SubmissionSource.GALLERY -> R.string.daily_selfie_upload_ok
