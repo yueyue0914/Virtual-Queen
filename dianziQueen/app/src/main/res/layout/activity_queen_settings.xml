@@ -12,6 +12,7 @@
         android:orientation="vertical">
 
         <TextView
+            android:id="@+id/settingsPageTitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/settings_title"
@@ -20,12 +21,58 @@
             android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/settingsPageSubtitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:text="@string/settings_subtitle"
             android:textColor="@color/text_red_dim"
             android:textSize="13sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/bg_access_frame"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/honorific_settings_section_title"
+                android:textColor="@color/text_red_primary"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/honorific_settings_section_subtitle"
+                android:textColor="@color/text_red_dim"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/settingsHonorificCurrentText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:textColor="@color/crimson_glow"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/settingsHonorificChangeButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_submit_blood"
+                android:text="@string/honorific_settings_change_btn"
+                android:textAllCaps="false"
+                android:textColor="@color/submit_text_black"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -60,6 +107,7 @@
                 android:textSize="14sp" />
 
             <TextView
+                android:id="@+id/settingsInjectionNote"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
@@ -77,6 +125,7 @@
             android:padding="16dp">
 
             <TextView
+                android:id="@+id/settingsFloatAvatarTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/settings_float_avatar_title"
@@ -150,6 +199,7 @@
                         android:src="@drawable/nvw1" />
 
                     <TextView
+                        android:id="@+id/settingsFloatStyleNvw1Label"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
@@ -188,6 +238,7 @@
                         android:src="@drawable/nvw2" />
 
                     <TextView
+                        android:id="@+id/settingsFloatStyleNvw2Label"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
@@ -217,6 +268,7 @@
                         android:src="@drawable/nvw3" />
 
                     <TextView
+                        android:id="@+id/settingsFloatStyleNvw3Label"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"

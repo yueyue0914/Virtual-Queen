@@ -95,6 +95,16 @@
             android:theme="@style/Theme.DianziQueen"
             android:turnScreenOn="true" />
 
+        <activity
+            android:name=".UninstallThreatActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait"
+            android:showWhenLocked="true"
+            android:theme="@style/Theme.DianziQueen"
+            android:turnScreenOn="true" />
+
         <receiver
             android:name=".QueenDeviceAdminReceiver"
             android:exported="true"

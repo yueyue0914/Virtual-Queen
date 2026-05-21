@@ -83,12 +83,12 @@ object DomesticPermissionGuide {
     fun showStrongGuide(activity: AppCompatActivity) {
         if (activity.isFinishing || activity.isDestroyed) return
         val message = when (detectBrand()) {
-            DomesticBrand.XIAOMI -> activity.getString(R.string.domestic_guide_message_xiaomi)
-            DomesticBrand.HUAWEI -> activity.getString(R.string.domestic_guide_message_huawei)
-            DomesticBrand.OTHER -> activity.getString(R.string.domestic_guide_message_default)
+            DomesticBrand.XIAOMI -> activity.hon(R.string.domestic_guide_message_xiaomi)
+            DomesticBrand.HUAWEI -> activity.hon(R.string.domestic_guide_message_huawei)
+            DomesticBrand.OTHER -> activity.hon(R.string.domestic_guide_message_default)
         }
         androidx.appcompat.app.AlertDialog.Builder(activity)
-            .setTitle(R.string.domestic_guide_title)
+            .setTitle(activity.hon(R.string.domestic_guide_title))
             .setMessage(message)
             .setPositiveButton(R.string.domestic_guide_go_settings) { _, _ ->
                 openPermissionSettings(activity)

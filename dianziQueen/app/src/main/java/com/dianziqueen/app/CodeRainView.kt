@@ -36,7 +36,7 @@ class CodeRainView @JvmOverloads constructor(
 
     private val handler = Handler(Looper.getMainLooper())
     private var activatedMode = false
-    private var phrases: List<String> = CodeRainPhrases.lines(false)
+    private var phrases: List<String> = emptyList()
     private val falling = mutableListOf<FallingBlock>()
     private val frameDelay = 48L
     private val spawnChance = 0.07f
@@ -87,15 +87,22 @@ class CodeRainView @JvmOverloads constructor(
     fun setActivatedMode(activated: Boolean) {
         val modeChanged = activatedMode != activated
         activatedMode = activated
-        phrases = CodeRainPhrases.lines(activated)
+        reloadPhrases(activated)
         if (modeChanged) {
             falling.clear()
             laneBusy.fill(false)
         }
     }
 
+    fun reloadPhrases(activated: Boolean) {
+        phrases = CodeRainPhrases.lines(context, activated)
+    }
+
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        if (phrases.isEmpty()) {
+            reloadPhrases(activatedMode)
+        }
         handler.post(updateRunnable)
     }
 

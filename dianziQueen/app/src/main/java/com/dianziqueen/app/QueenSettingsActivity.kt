@@ -15,6 +15,8 @@ class QueenSettingsActivity : AppCompatActivity() {
     private lateinit var calendarCountText: TextView
     private lateinit var releaseBodyText: TextView
     private lateinit var releaseButton: Button
+    private lateinit var honorificCurrentText: TextView
+    private lateinit var honorificChangeButton: Button
 
     private lateinit var floatStyleOptions: List<FloatStyleOption>
 
@@ -31,6 +33,18 @@ class QueenSettingsActivity : AppCompatActivity() {
         calendarCountText = findViewById(R.id.settingsCalendarCountText)
         releaseBodyText = findViewById(R.id.settingsReleaseBodyText)
         releaseButton = findViewById(R.id.settingsReleaseButton)
+        honorificCurrentText = findViewById(R.id.settingsHonorificCurrentText)
+        honorificChangeButton = findViewById(R.id.settingsHonorificChangeButton)
+
+        honorificChangeButton.setOnClickListener {
+            QueenHonorific.showPicker(this) {
+                refreshHonorificSection()
+                refreshReleaseTexts()
+                applyHonorificToStaticLabels()
+                refreshFloatAvatarStyleLabels()
+                QueenFloatingOverlay.refreshHonorificLabels()
+            }
+        }
 
         floatStyleOptions = listOf(
             FloatStyleOption(findViewById(R.id.settingsFloatStyleDefault), QueenFloatingAvatarStyle.DEFAULT),
@@ -49,6 +63,10 @@ class QueenSettingsActivity : AppCompatActivity() {
         releaseButton.setOnClickListener { confirmAndRelease() }
         refreshStats()
         refreshFloatAvatarSelectionUi()
+        refreshHonorificSection()
+        refreshReleaseTexts()
+        applyHonorificToStaticLabels()
+        refreshFloatAvatarStyleLabels()
     }
 
     override fun onResume() {
@@ -56,6 +74,39 @@ class QueenSettingsActivity : AppCompatActivity() {
         refreshStats()
         updateReleaseButtonLabel()
         refreshFloatAvatarSelectionUi()
+        refreshHonorificSection()
+        refreshReleaseTexts()
+        applyHonorificToStaticLabels()
+        refreshFloatAvatarStyleLabels()
+    }
+
+    private fun applyHonorificToStaticLabels() {
+        findViewById<TextView>(R.id.settingsPageTitle).text = hon(R.string.settings_title)
+        findViewById<TextView>(R.id.settingsPageSubtitle).text = hon(R.string.settings_subtitle)
+        findViewById<TextView>(R.id.settingsInjectionNote).text = hon(R.string.settings_injection_note)
+        findViewById<TextView>(R.id.settingsFloatAvatarTitle)?.text =
+            hon(R.string.settings_float_avatar_title)
+    }
+
+    private fun refreshHonorificSection() {
+        honorificCurrentText.text = getString(
+            R.string.honorific_settings_current_fmt,
+            QueenHonorific.displayName(this),
+        )
+    }
+
+    private fun refreshFloatAvatarStyleLabels() {
+        findViewById<TextView>(R.id.settingsFloatStyleNvw1Label)?.text =
+            hon(R.string.settings_float_avatar_nvw1_label)
+        findViewById<TextView>(R.id.settingsFloatStyleNvw2Label)?.text =
+            hon(R.string.settings_float_avatar_nvw2_label)
+        findViewById<TextView>(R.id.settingsFloatStyleNvw3Label)?.text =
+            hon(R.string.settings_float_avatar_nvw3_label)
+    }
+
+    private fun refreshReleaseTexts() {
+        val cost = QueenReleaseManager.RELEASE_COST_POINTS
+        releaseBodyText.text = hon(R.string.settings_release_body, cost)
     }
 
     private fun selectFloatAvatarStyle(style: QueenFloatingAvatarStyle) {
@@ -65,7 +116,8 @@ class QueenSettingsActivity : AppCompatActivity() {
             QueenService.start(this)
         }
         refreshFloatAvatarSelectionUi()
-        Toast.makeText(this, R.string.settings_float_avatar_applied, Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, hon(R.string.settings_float_avatar_applied), Toast.LENGTH_SHORT).show()
+        refreshFloatAvatarStyleLabels()
     }
 
     private fun refreshFloatAvatarSelectionUi() {
@@ -91,16 +143,15 @@ class QueenSettingsActivity : AppCompatActivity() {
     private fun updateReleaseButtonLabel() {
         val cost = QueenReleaseManager.RELEASE_COST_POINTS
         val points = QueenPointsStore.getPoints(this)
-        releaseBodyText.text = getString(R.string.settings_release_body, cost)
-        releaseButton.text = getString(R.string.settings_release_btn_fmt, cost, points)
+        releaseButton.text = hon(R.string.settings_release_btn_fmt, cost, points)
     }
 
     private fun confirmAndRelease() {
         val cost = QueenReleaseManager.RELEASE_COST_POINTS
         val points = QueenPointsStore.getPoints(this)
         AlertDialog.Builder(this)
-            .setTitle(R.string.settings_release_confirm_title)
-            .setMessage(getString(R.string.settings_release_confirm_msg, cost, points))
+            .setTitle(hon(R.string.settings_release_confirm_title))
+            .setMessage(hon(R.string.settings_release_confirm_msg, cost, points))
             .setPositiveButton(android.R.string.ok) { _, _ -> performRelease() }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
@@ -109,18 +160,18 @@ class QueenSettingsActivity : AppCompatActivity() {
     private fun performRelease() {
         when (QueenReleaseManager.performRelease(this)) {
             is QueenReleaseManager.ReleaseResult.Success -> {
-                Toast.makeText(this, R.string.settings_release_ok, Toast.LENGTH_LONG).show()
+                Toast.makeText(this, hon(R.string.settings_release_ok), Toast.LENGTH_LONG).show()
                 setResult(RESULT_OK)
                 finish()
             }
             QueenReleaseManager.ReleaseResult.NotActivated -> {
-                Toast.makeText(this, R.string.settings_release_not_activated, Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, hon(R.string.settings_release_not_activated), Toast.LENGTH_SHORT).show()
                 finish()
             }
             QueenReleaseManager.ReleaseResult.InsufficientPoints -> {
                 Toast.makeText(
                     this,
-                    getString(
+                    hon(
                         R.string.settings_release_points_insufficient,
                         QueenReleaseManager.RELEASE_COST_POINTS,
                         QueenPointsStore.getPoints(this),

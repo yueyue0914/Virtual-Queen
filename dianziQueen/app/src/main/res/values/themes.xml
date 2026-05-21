@@ -20,10 +20,10 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:background">@drawable/bg_queen_float_menu_item</item>
         <item name="android:gravity">center</item>
-        <item name="android:paddingHorizontal">8dp</item>
-        <item name="android:paddingVertical">10dp</item>
+        <item name="android:paddingHorizontal">4dp</item>
+        <item name="android:paddingVertical">5dp</item>
         <item name="android:textColor">@color/text_red_primary</item>
-        <item name="android:textSize">13sp</item>
-        <item name="android:layout_marginBottom">4dp</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:layout_marginBottom">2dp</item>
     </style>
 </resources>

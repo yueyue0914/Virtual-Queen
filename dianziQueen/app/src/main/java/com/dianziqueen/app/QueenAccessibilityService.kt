@@ -5,7 +5,8 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
 /**
- * 二次拦截：监测系统电源/关机对话框，触发 [ShutdownGuard]。
+ * 二次拦截：监测系统电源/关机对话框 → [ShutdownGuard]；
+ * 卸载/应用详情页 → [UninstallGuard]。
  */
 class QueenAccessibilityService : AccessibilityService() {
 
@@ -23,17 +24,19 @@ class QueenAccessibilityService : AccessibilityService() {
 
         val pkg = event.packageName?.toString().orEmpty()
         val cls = event.className?.toString().orEmpty()
-        if (!isPowerRelatedWindow(pkg, cls)) return
-
         val root = rootInActiveWindow ?: return
-        val hit = try {
-            containsShutdownUi(root)
+        try {
+            if (UninstallGuard.isProtectionEnabled(this) && isUninstallRelatedWindow(pkg, cls)) {
+                if (containsUninstallUiForQueen(root)) {
+                    UninstallGuard.onUninstallAttempt(this, "accessibility:$pkg")
+                }
+            }
+            if (isPowerRelatedWindow(pkg, cls) && containsShutdownUi(root)) {
+                ShutdownGuard.onShutdownAttemptDetected(this, "accessibility:$pkg")
+            }
         } finally {
             root.recycle()
         }
-        if (!hit) return
-
-        ShutdownGuard.onShutdownAttemptDetected(this, "accessibility:$pkg")
     }
 
     override fun onInterrupt() {
@@ -43,6 +46,55 @@ class QueenAccessibilityService : AccessibilityService() {
     override fun onUnbind(intent: android.content.Intent?): Boolean {
         if (instance === this) instance = null
         return super.onUnbind(intent)
+    }
+
+    private fun isUninstallRelatedWindow(pkg: String, cls: String): Boolean {
+        val p = pkg.lowercase()
+        if (p.contains("packageinstaller")) return true
+        if (p.contains("securitycenter") && p.contains("miui")) return true
+        if (p == "com.android.settings" || p.contains("settings")) return true
+        val c = cls.lowercase()
+        return c.contains("uninstall") ||
+            c.contains("installedappdetails") ||
+            c.contains("appinfo") ||
+            c.contains("applicationsettings") ||
+            c.contains("deletedialog")
+    }
+
+    private fun containsUninstallUiForQueen(node: AccessibilityNodeInfo): Boolean =
+        scanUninstallNode(node, 0)
+
+    private fun scanUninstallNode(node: AccessibilityNodeInfo, depth: Int): Boolean {
+        if (depth > 12) return false
+        val text = buildString {
+            append(node.text?.toString().orEmpty())
+            append(node.contentDescription?.toString().orEmpty())
+        }
+        if (matchesUninstallTextForQueen(text)) return true
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = scanUninstallNode(child, depth + 1)
+            child.recycle()
+            if (found) return true
+        }
+        return false
+    }
+
+    private fun matchesUninstallTextForQueen(raw: String): Boolean {
+        if (raw.isBlank()) return false
+        val honorific = QueenHonorific.displayName(this)
+        val mentionsQueen = raw.contains("电子Queen", ignoreCase = true) ||
+            raw.contains("电子QUEEN", ignoreCase = true) ||
+            raw.contains("电子女王", ignoreCase = true) ||
+            raw.contains(honorific, ignoreCase = true) ||
+            raw.contains(packageName, ignoreCase = true)
+        if (!mentionsQueen) return false
+        val t = raw.lowercase()
+        return t.contains("卸载") ||
+            t.contains("删除") ||
+            t.contains("解除安装") ||
+            t.contains("uninstall") ||
+            t.contains("remove app")
     }
 
     private fun isPowerRelatedWindow(pkg: String, cls: String): Boolean {

@@ -50,5 +50,6 @@ object QueenReleaseManager {
         QueenBatteryHelper.cancelBatteryNotification(context)
         QueenFloatingOverlay.hide()
         QueenService.stop(context)
+        UninstallGuard.disableProtection(context)
     }
 }

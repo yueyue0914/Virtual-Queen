@@ -126,8 +126,8 @@ object FloatingWindowPermissionHelper {
     fun showXiaomiGuideDialog(activity: AppCompatActivity, onConfirmed: (() -> Unit)? = null) {
         if (activity.isFinishing || activity.isDestroyed) return
         AlertDialog.Builder(activity)
-            .setTitle(R.string.overlay_xiaomi_guide_title)
-            .setMessage(R.string.overlay_xiaomi_guide_message)
+            .setTitle(activity.hon(R.string.overlay_xiaomi_guide_title))
+            .setMessage(activity.hon(R.string.overlay_xiaomi_guide_message))
             .setPositiveButton(R.string.overlay_xiaomi_guide_go) { _, _ ->
                 requestPermission(activity)
                 if (!tryOpenXiaomiExtraSettings(activity)) {
@@ -139,7 +139,7 @@ object FloatingWindowPermissionHelper {
                 tryOpenXiaomiExtraSettings(activity)
             }
             .setNegativeButton(R.string.overlay_xiaomi_guide_later) { _, _ ->
-                Toast.makeText(activity, R.string.overlay_xiaomi_guide_later_toast, Toast.LENGTH_LONG).show()
+                Toast.makeText(activity, activity.hon(R.string.overlay_xiaomi_guide_later_toast), Toast.LENGTH_LONG).show()
             }
             .setCancelable(false)
             .show()
@@ -148,7 +148,7 @@ object FloatingWindowPermissionHelper {
     /** 通用检查 + 引导（自检按钮、权限流程可调用）。 */
     fun checkAndRequest(activity: AppCompatActivity) {
         if (hasPermission(activity)) {
-            Toast.makeText(activity, R.string.overlay_already_granted, Toast.LENGTH_SHORT).show()
+            Toast.makeText(activity, activity.hon(R.string.overlay_already_granted), Toast.LENGTH_SHORT).show()
             QueenService.start(activity)
             return
         }
@@ -172,8 +172,8 @@ object FloatingWindowPermissionHelper {
     private fun showGenericGuideDialog(activity: AppCompatActivity) {
         if (activity.isFinishing || activity.isDestroyed) return
         AlertDialog.Builder(activity)
-            .setTitle(R.string.overlay_guide_title)
-            .setMessage(R.string.overlay_guide_message_generic)
+            .setTitle(activity.hon(R.string.overlay_guide_title))
+            .setMessage(activity.hon(R.string.overlay_guide_message_generic))
             .setPositiveButton(R.string.overlay_guide_go_settings) { _, _ ->
                 requestPermission(activity)
             }

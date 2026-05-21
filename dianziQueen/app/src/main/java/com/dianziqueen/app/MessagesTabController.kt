@@ -3,6 +3,7 @@ package com.dianziqueen.app
 
 
 import android.view.View
+import android.widget.TextView
 
 import androidx.activity.result.contract.ActivityResultContracts
 
@@ -34,6 +35,8 @@ class MessagesTabController(
 
 
     private val messagesList: RecyclerView = messagesRoot.findViewById(R.id.messagesList)
+    private val messagesTitleText: TextView = messagesRoot.findViewById(R.id.messagesTitleText)
+    private val messagesSubtitleText: TextView = messagesRoot.findViewById(R.id.messagesSubtitleText)
 
     private val adapter = QueenMessageAdapter { message -> openPhotoFullscreen(message) }
 
@@ -75,7 +78,14 @@ class MessagesTabController(
 
 
 
+    fun refreshHonorificLabels() {
+        messagesTitleText.text = activity.hon(R.string.messages_title)
+        messagesSubtitleText.text = activity.hon(R.string.messages_subtitle)
+        refreshList(scrollToEnd = false)
+    }
+
     fun onTabShown() {
+        refreshHonorificLabels()
         QueenMessageStore.ensureSessionOpened(activity)
         QueenMessageStore.markAllRead(activity)
         onUnreadChanged()

@@ -38,6 +38,7 @@ class AlbumTabController(
         private const val COST_DELETE = 40
         private const val VIEW_MAX_SIDE = 2048
     }
+    private val albumTitleText: TextView = albumRoot.findViewById(R.id.albumTitleText)
     private val albumSubtitleText: TextView = albumRoot.findViewById(R.id.albumSubtitleText)
     private val albumEmptyText: TextView = albumRoot.findViewById(R.id.albumEmptyText)
     private val albumGrid: RecyclerView = albumRoot.findViewById(R.id.albumGrid)
@@ -51,12 +52,13 @@ class AlbumTabController(
     private val thumbCache = android.util.LruCache<String, Bitmap>(24)
 
     private var pendingCaptureUri: Uri? = null
+    private val gallerySourceEraser = QueenGallerySourceEraser.Helper(activity)
 
     private val pickImageLauncher = activity.registerForActivityResult(
         ActivityResultContracts.GetContent(),
     ) { uri ->
         if (uri == null) return@registerForActivityResult
-        importFromUri(uri)
+        importFromUri(uri, eraseGallerySource = true)
     }
 
     private val takePictureLauncher = activity.registerForActivityResult(
@@ -65,7 +67,7 @@ class AlbumTabController(
         val uri = pendingCaptureUri
         pendingCaptureUri = null
         if (success && uri != null) {
-            importFromUri(uri)
+            importFromUri(uri, eraseGallerySource = false)
             try {
                 activity.contentResolver.delete(uri, null, null)
             } catch (_: Exception) { }
@@ -101,10 +103,16 @@ class AlbumTabController(
         refreshGrid()
     }
 
+    fun refreshHonorificLabels() {
+        refreshGrid()
+        albumTitleText.text = activity.hon(R.string.album_title)
+        albumEmptyText.text = activity.hon(R.string.album_empty)
+    }
+
     fun refreshGrid() {
         val ids = QueenAlbumVault.listPhotoIds(activity)
         albumSubtitleText.text =
-            activity.getString(R.string.album_subtitle_fmt, ids.size)
+            activity.hon(R.string.album_subtitle_fmt, ids.size)
         adapter.submitList(ids)
         albumEmptyText.visibility = if (ids.isEmpty()) View.VISIBLE else View.GONE
         albumGrid.visibility = if (ids.isEmpty()) View.GONE else View.VISIBLE
@@ -176,7 +184,7 @@ class AlbumTabController(
         }
     }
 
-    private fun importFromUri(uri: Uri) {
+    private fun importFromUri(uri: Uri, eraseGallerySource: Boolean) {
         val bytes = try {
             activity.contentResolver.openInputStream(uri)?.use { it.readBytes() }
         } catch (_: Exception) {
@@ -190,6 +198,9 @@ class AlbumTabController(
         if (id == null) {
             Toast.makeText(activity, R.string.album_import_failed, Toast.LENGTH_SHORT).show()
             return
+        }
+        if (eraseGallerySource) {
+            gallerySourceEraser.eraseAfterVaultImport(uri)
         }
         preloadThumbnail(id)
         refreshGrid()

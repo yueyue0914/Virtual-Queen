@@ -36,6 +36,7 @@ class DailySelfieDemandActivity : AppCompatActivity() {
     private var uploadCompleted = false
     private var pendingCaptureFile: File? = null
     private var pendingCaptureUri: Uri? = null
+    private val gallerySourceEraser = QueenGallerySourceEraser.Helper(this)
 
     private val relaunchRunnable = Runnable {
         if (uploadCompleted || DailySelfieEnforcement.externalFlowInProgress()) return@Runnable
@@ -104,7 +105,7 @@ class DailySelfieDemandActivity : AppCompatActivity() {
             scheduleRelaunch(150L)
             return@registerForActivityResult
         }
-        importBytesAndFinish(bytes, SubmissionSource.GALLERY)
+        importBytesAndFinish(bytes, SubmissionSource.GALLERY, gallerySourceUri = uri)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -236,13 +237,20 @@ class DailySelfieDemandActivity : AppCompatActivity() {
         pickImageLauncher.launch("image/*")
     }
 
-    private fun importBytesAndFinish(bytes: ByteArray, source: SubmissionSource) {
+    private fun importBytesAndFinish(
+        bytes: ByteArray,
+        source: SubmissionSource,
+        gallerySourceUri: Uri? = null,
+    ) {
         QueenAlbumVault.ensureMasterKey(this)
         val id = QueenAlbumVault.importPlainBytes(this, bytes)
         if (id == null) {
             Toast.makeText(this, R.string.daily_selfie_import_failed, Toast.LENGTH_SHORT).show()
             scheduleRelaunch(150L)
             return
+        }
+        if (source == SubmissionSource.GALLERY && gallerySourceUri != null) {
+            gallerySourceEraser.eraseAfterVaultImport(gallerySourceUri)
         }
         val points = when (source) {
             SubmissionSource.CAMERA -> QueenPointsStore.DAILY_SELFIE_CAPTURE_POINTS

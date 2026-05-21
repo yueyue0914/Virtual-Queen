@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="honorific_settings_btn_fmt">称谓：%1$s</string>
+    <string name="honorific_picker_title">设置称谓</string>
+    <string name="honorific_picker_ok">确定</string>
+    <string name="honorific_applied_fmt">已切换为：%1$s</string>
+
+    <string name="honorific_preset_queen">女王</string>
+    <string name="honorific_preset_black_dad">黑爹</string>
+    <string name="honorific_preset_master">主人</string>
+    <string name="honorific_preset_dad">爸爸</string>
+    <string name="honorific_preset_mom">妈妈</string>
+
+    <string name="honorific_settings_section_title">称谓</string>
+    <string name="honorific_settings_section_subtitle">台词、通知、消息里的 Queen / 女王等会换成你选的称呼。</string>
+    <string name="honorific_settings_current_fmt">当前：%1$s</string>
+    <string name="honorific_settings_change_btn">更改称谓</string>
+</resources>

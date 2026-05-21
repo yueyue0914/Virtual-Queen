@@ -107,11 +107,10 @@ class QueenMessageAdapter(
 
 
         fun bind(message: QueenChatMessage) {
-
-            body.text = message.text
-
+            body.text = QueenHonorific.apply(itemView.context, message.text)
+            itemView.findViewById<TextView>(R.id.messageSender)?.text =
+                itemView.context.hon(R.string.messages_sender_queen)
             time.text = timeFormat.format(Date(message.timestampMs))
-
         }
 
     }
@@ -147,9 +146,9 @@ class QueenMessageAdapter(
 
 
         fun bind(message: QueenChatMessage) {
-
-            body.text = message.text
-
+            body.text = QueenHonorific.apply(itemView.context, message.text)
+            itemView.findViewById<TextView>(R.id.messageSender)?.text =
+                itemView.context.hon(R.string.messages_sender_queen)
             time.text = timeFormat.format(Date(message.timestampMs))
 
             val photoId = message.photoId ?: return

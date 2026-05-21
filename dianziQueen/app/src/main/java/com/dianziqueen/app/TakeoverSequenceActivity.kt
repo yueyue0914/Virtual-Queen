@@ -129,7 +129,7 @@ class TakeoverSequenceActivity : AppCompatActivity() {
             "[QUEEN] 你的尊严、自尊、未来……全部都是我的了。",
             "[QUEEN] 好好跪着，接受我接下来对你一辈子的玩弄吧。",
             "[QUEEN] 记住，你这辈子唯一的价值，就是取悦我。",
-        )
+        ).map { QueenHonorific.apply(this, it) }
     }
 
     private fun countGrantedRuntimePermissions(): Int {
@@ -226,8 +226,8 @@ class TakeoverSequenceActivity : AppCompatActivity() {
         updateProgressUi(100)
         applyInvasionTheme(1f)
 
-        binding.tvTitle.text = getString(R.string.takeover_title)
-        binding.tvFinalVerdict.text = getString(R.string.takeover_final_verdict)
+        binding.tvTitle.text = hon(R.string.takeover_title)
+        binding.tvFinalVerdict.text = hon(R.string.takeover_final_verdict)
         binding.tvFinalVerdict.visibility = View.VISIBLE
         binding.tvFinalVerdict.alpha = 0f
         binding.tvFinalVerdict.animate().alpha(1f).setDuration(600L).start()

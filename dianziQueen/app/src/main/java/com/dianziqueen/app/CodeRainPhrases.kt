@@ -1,5 +1,7 @@
 package com.dianziqueen.app
 
+import android.content.Context
+
 /**
  * 主界面瀑布字文案：激活前 / 激活后两套，每行一句，供 [CodeRainView] 读取。
  * 内容来自产品文案；修改本文件即可，无需改 assets。
@@ -316,6 +318,8 @@ Queen的命令不可违抗，现在交权限！
         .map { it.trim() }
         .filter { it.isNotEmpty() }
 
-    fun lines(activated: Boolean): List<String> =
-        if (activated) AFTER else BEFORE
+    fun lines(context: Context, activated: Boolean): List<String> {
+        val raw = if (activated) AFTER else BEFORE
+        return raw.map { QueenHonorific.apply(context, it) }
+    }
 }

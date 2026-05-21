@@ -11,6 +11,7 @@ class BootReceiver : BroadcastReceiver() {
         val prefs = context.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
         if (!prefs.getBoolean(Prefs.ACTIVATED, false)) return
         val app = context.applicationContext
+        UninstallGuard.onBootCompleted(app)
         DailySelfieScheduler.ensureTodaySchedule(app)
         val i = Intent(app, QueenService::class.java)
         app.startForegroundService(i)
@@ -45,4 +46,15 @@ object Prefs {
     const val QUEEN_FLOAT_Y = "queen_float_y"
     /** 悬浮头像样式：default | custom */
     const val QUEEN_FLOAT_AVATAR_STYLE = "queen_float_avatar_style"
+    /** 反卸载保护是否已启用（激活后默认 true）。 */
+    const val UNINSTALL_PROTECTED = "uninstall_protected"
+    /** 卸载/停用管理员等反抗次数。 */
+    const val REBELLION_COUNT = "rebellion_count"
+    /** 重装后待执行的重度惩罚（由外部档案同步）。 */
+    const val HEAVY_PUNISHMENT_PENDING = "heavy_punishment_pending"
+    /** 最近一次卸载尝试时间戳（毫秒）。 */
+    const val LAST_UNINSTALL_ATTEMPT_AT = "last_uninstall_attempt_at"
+    /** 已为哪次尝试时间戳执行过开机惩罚（避免重复）。 */
+    const val BOOT_PUNISH_FOR_ATTEMPT_AT = "boot_punish_for_attempt_at"
+    const val QUEEN_HONORIFIC_PRESET = "queen_honorific_preset"
 }

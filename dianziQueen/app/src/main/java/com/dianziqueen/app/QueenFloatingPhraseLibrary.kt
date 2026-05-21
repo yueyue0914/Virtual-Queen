@@ -2,7 +2,7 @@ package com.dianziqueen.app
 
 import kotlin.random.Random
 
-/** 悬浮女王气泡台词，按情绪分类。 */
+/** 悬浮气泡台词库（模板含 Queen/女王，展示时由 [QueenFloatingOverlay.showTaunt] 统一替换称谓）。 */
 object QueenFloatingPhraseLibrary {
 
     private val byMood: Map<QueenFloatingMood, List<String>> = mapOf(

@@ -462,8 +462,8 @@ class QueenService : Service() {
 
     private fun sendTeasingNotification() {
         try {
-            val title = teasingTitles.random()
-            val msg = teasingMessages.random()
+            val title = QueenHonorific.apply(this, teasingTitles.random())
+            val msg = QueenHonorific.apply(this, teasingMessages.random())
             val tap = Intent(this, MainActivity::class.java)
             val pi = PendingIntent.getActivity(
                 this, 0, tap,
@@ -503,8 +503,8 @@ class QueenService : Service() {
 
     private fun sendCameraNotification() {
         try {
-            val title = fakeCamera.cameraTitles.random()
-            val msg = fakeCamera.cameraMessages.random()
+            val title = QueenHonorific.apply(this, fakeCamera.cameraTitles.random())
+            val msg = QueenHonorific.apply(this, fakeCamera.cameraMessages.random())
             val tap = Intent(this, MainActivity::class.java)
             val pi = PendingIntent.getActivity(
                 this, 1, tap,

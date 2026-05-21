@@ -158,14 +158,17 @@ object QueenMessageStore {
         if (load(context).isNotEmpty()) return
         appendQueenMessage(
             context,
-            "消息通道已接通。从现在起，本女王会不定时来骂你、笑你。别妄想回复，你只配跪着读。",
+            QueenHonorific.apply(
+                context,
+                "消息通道已接通。从现在起，本女王会不定时来骂你、笑你。别妄想回复，你只配跪着读。",
+            ),
         )
     }
 
     private fun randomInsultLine(context: Context): String? {
         if (!isActivated(context)) return null
         val recent = load(context).takeLast(10).map { it.text }
-        return QueenInsultLibrary.getRandom(recent)
+        return QueenInsultLibrary.getRandom(recent)?.let { QueenHonorific.apply(context, it) }
     }
 
     private fun isActivated(context: Context): Boolean =

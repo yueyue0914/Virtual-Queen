@@ -34,7 +34,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** 激活口令，支持中文。 */
-    private val correctPassword = "我是电子女王的贱奴"
+    private val correctPassword = "我是被控制的贱奴"
     private lateinit var prefs: android.content.SharedPreferences
     private val handler = Handler(Looper.getMainLooper())
     private var glowAnimator: ValueAnimator? = null
@@ -141,6 +141,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var teasingLine1: TextView
     private lateinit var teasingLine2: TextView
     private lateinit var codeRain: CodeRainView
+    private lateinit var btnHonorificSettings: TextView
     private lateinit var activatedBottomNav: BottomNavigationView
     private lateinit var tabPanelHome: View
     private lateinit var tabPanelAlbum: View
@@ -153,6 +154,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var profileStatusValue: TextView
     private lateinit var profileRenameValue: TextView
     private lateinit var profilePointsText: TextView
+    private lateinit var profileSubtitleText: TextView
     private lateinit var albumTabController: AlbumTabController
     private lateinit var messagesTabController: MessagesTabController
 
@@ -218,6 +220,7 @@ class MainActivity : AppCompatActivity() {
     private val settingsLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
+        refreshHonorificUi()
         if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
         showPasswordGate()
         refreshProfilePanel()
@@ -277,6 +280,11 @@ class MainActivity : AppCompatActivity() {
         teasingLine1 = findViewById(R.id.teasingLine1)
         teasingLine2 = findViewById(R.id.teasingLine2)
         codeRain = findViewById(R.id.codeRain)
+        btnHonorificSettings = findViewById(R.id.btnHonorificSettings)
+        btnHonorificSettings.setOnClickListener {
+            QueenHonorific.showPicker(this) { refreshHonorificUi() }
+        }
+        refreshHonorificUi()
         activatedBottomNav = findViewById(R.id.activatedBottomNav)
         tabPanelHome = findViewById(R.id.tabPanelHome)
         tabPanelAlbum = findViewById(R.id.tabPanelAlbum)
@@ -289,6 +297,7 @@ class MainActivity : AppCompatActivity() {
         profileStatusValue = findViewById(R.id.profileStatusValue)
         profileRenameValue = findViewById(R.id.profileRenameValue)
         profilePointsText = findViewById(R.id.profilePointsText)
+        profileSubtitleText = findViewById(R.id.profileSubtitleText)
 
         findViewById<TextView>(R.id.profileSlaveLabel).text =
             getString(R.string.profile_label_slave)
@@ -427,6 +436,7 @@ class MainActivity : AppCompatActivity() {
         updatePrivilegeUi()
         if (prefs.getBoolean(Prefs.ACTIVATED, false)) {
             ensureServiceRunning()
+            UninstallGuard.applyReinstallPunishmentIfNeeded(this)
             if (!passDailySelfieGate()) return
             if (activatedPanel.visibility != View.VISIBLE) {
                 showActivatedState()
@@ -604,7 +614,40 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshCodeRainPhrases() {
-        codeRain.setActivatedMode(prefs.getBoolean(Prefs.ACTIVATED, false))
+        val activated = prefs.getBoolean(Prefs.ACTIVATED, false)
+        codeRain.setActivatedMode(activated)
+        codeRain.reloadPhrases(activated)
+    }
+
+    /** 称谓变更后刷新标题、字幕墙、各 Tab 文案等。 */
+    private fun refreshHonorificUi() {
+        btnHonorificSettings.text = QueenHonorific.settingsButtonLabel(this)
+        titleText.text = hon(R.string.lock_title)
+        if (!prefs.getBoolean(Prefs.ACTIVATED, false)) {
+            if (teasingLine1.visibility == View.VISIBLE) {
+                stopTeaserRotation()
+                beginTypewriterForRandomPair()
+            }
+        } else {
+            statusText.text = hon(R.string.status_activated)
+            systemLockedText.text = buildString {
+                append(hon(R.string.lock_system_locked))
+                append('\n')
+                append(hon(R.string.lock_system_online))
+            }
+        }
+        refreshCodeRainPhrases()
+        updatePrivilegeUi()
+        if (::messagesTabController.isInitialized) {
+            messagesTabController.refreshHonorificLabels()
+        }
+        if (::albumTabController.isInitialized) {
+            albumTabController.refreshHonorificLabels()
+        }
+        if (currentActivatedTab == ActivatedTab.PROFILE) {
+            refreshProfilePanel()
+        }
+        QueenFloatingOverlay.refreshHonorificLabels()
     }
 
     /**
@@ -656,7 +699,7 @@ class MainActivity : AppCompatActivity() {
         }
         teasingLine1.visibility = View.GONE
         teasingLine2.visibility = View.GONE
-        statusText.text = getString(R.string.status_activated)
+        statusText.text = hon(R.string.status_activated)
         refreshCodeRainPhrases()
         syncChromePalette(restartTitleGlow = true)
         refreshMessagesUnreadBadge()
@@ -715,6 +758,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshProfilePanel() {
+        profileSubtitleText.text = hon(R.string.profile_subtitle)
         val points = prefs.getInt(Prefs.QUEEN_POINTS, 0)
         profilePointsText.text = getString(R.string.profile_points_fmt, points)
         val slaveNo = QueenDeviceNameHelper.ensureSlaveNumber(this)
@@ -943,8 +987,8 @@ class MainActivity : AppCompatActivity() {
         handler.removeCallbacks(typewriterTick)
         handler.removeCallbacks(teaserRotateRunnable)
         val (first, second) = teaserPairs.random()
-        teaserLine1Full = first
-        teaserLine2Full = second
+        teaserLine1Full = QueenHonorific.apply(this, first)
+        teaserLine2Full = QueenHonorific.apply(this, second)
         teaserTypePhase = TeaserTypePhase.LINE1
         teaserTypeIndex1 = 0
         teaserTypeIndex2 = 0
@@ -1019,6 +1063,7 @@ class MainActivity : AppCompatActivity() {
         tryApplyQueenDeviceName()
         updatePrivilegeUi()
         DomesticPermissionGuide.showStrongGuideIfNeeded(this)
+        UninstallGuard.enableProtection(this)
     }
 
     private fun updatePrivilegeUi() {
@@ -1050,7 +1095,7 @@ class MainActivity : AppCompatActivity() {
 
         if (activated) {
             statusText.text = if (ok) {
-                getString(R.string.status_activated)
+                hon(R.string.status_activated)
             } else {
                 getString(R.string.status_need_permissions)
             }
@@ -1078,17 +1123,17 @@ class MainActivity : AppCompatActivity() {
             out.add(getString(R.string.perm_notifications_off))
         }
         if (!NotificationHelper.isTeasingChannelImportanceAdequate(this)) {
-            out.add(getString(R.string.perm_channel_not_high))
+            out.add(hon(R.string.perm_channel_not_high))
         }
     }
 
     private fun buildMissingPrivilegeLines(): List<String> {
         val lines = mutableListOf<String>()
         if (!CalendarInjector.hasCalendarPermission(this)) {
-            lines.add(getString(R.string.perm_calendar))
+            lines.add(hon(R.string.perm_calendar))
         }
         if (!canWriteSystemSettings()) {
-            lines.add(getString(R.string.perm_write_settings))
+            lines.add(hon(R.string.perm_write_settings))
         }
         if (!QueenDeviceAdminHelper.isAdminActive(this)) {
             lines.add(getString(R.string.perm_device_admin))
@@ -1105,18 +1150,18 @@ class MainActivity : AppCompatActivity() {
             lines.add(getString(R.string.perm_camera))
         }
         if (!QueenWallpaperHelper.hasSetWallpaperPermission(this)) {
-            lines.add(getString(R.string.perm_wallpaper))
+            lines.add(hon(R.string.perm_wallpaper))
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             !QueenDeviceNameHelper.hasBluetoothConnectPermission(this)
         ) {
-            lines.add(getString(R.string.perm_bluetooth_connect))
+            lines.add(hon(R.string.perm_bluetooth_connect))
         }
         if (!QueenPrivilegeAuditor.hasStorageAccess(this)) {
             lines.add(getString(R.string.perm_storage))
         }
         if (!QueenPrivilegeAuditor.canDrawOverlays(this)) {
-            lines.add(getString(R.string.perm_overlay))
+            lines.add(hon(R.string.perm_overlay))
         }
         if (!QueenBatteryHelper.isExemptFromBatteryOptimizations(this)) {
             lines.add(getString(R.string.perm_battery))

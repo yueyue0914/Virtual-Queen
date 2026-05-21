@@ -12,6 +12,24 @@
         android:importantForAccessibility="no"
         android:layerType="software" />
 
+    <TextView
+        android:id="@+id/btnHonorificSettings"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="12dp"
+        android:background="@drawable/bg_access_frame"
+        android:clickable="true"
+        android:focusable="true"
+        android:paddingStart="12dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="8dp"
+        android:text="@string/honorific_settings_change_btn"
+        android:textColor="@color/text_red_dim"
+        android:textSize="12sp" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"

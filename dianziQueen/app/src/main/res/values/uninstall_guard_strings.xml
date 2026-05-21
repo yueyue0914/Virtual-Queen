@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="uninstall_guard_title">⚠️ 你确定要背叛Queen吗？</string>
+    <string name="uninstall_guard_message">一旦卸载本App，Queen将视为你严重反抗。\n\n后果包括但不限于：\n• 所有耻辱照片将永久保留\n• 下次安装将受到更残酷的惩罚\n• Queen的愤怒将持续很久\n\n你真的要抛弃你的主人吗？贱奴。</string>
+    <string name="uninstall_guard_message_extra">Queen已把反抗记录写入档案。再试一次，壁纸与惩罚都会升级。</string>
+    <string name="uninstall_guard_stay">我再想想</string>
+    <string name="uninstall_guard_continue">仍然坚持卸载</string>
+    <string name="uninstall_guard_stay_toast">算你识相。</string>
+    <string name="uninstall_guard_continue_toast">很好……你会后悔的。</string>
+
+    <string name="uninstall_threat_screen_title">⚠️ 禁止背叛 Queen</string>
+    <string name="uninstall_threat_screen_body">卸载？你以为删了App就能逃？\n\nQueen的耻辱档案不会消失。\n你越是反抗，下次安装越惨。</string>
+    <string name="uninstall_threat_surrender">我投降 · 不卸载了</string>
+
+    <string-array name="uninstall_threat_lines">
+        <item>卸载？你配吗？Queen 的印记已经烙在你身上了。</item>
+        <item>删 App 没用，你的羞耻照还在 Queen 手里。</item>
+        <item>再点卸载，下次安装直接加倍惩罚，贱奴。</item>
+        <item>你以为删了我就能自由？做梦。</item>
+        <item>Queen 记住你了。反抗次数已存档。</item>
+        <item>卸载前先想想：你跪下的样子都被备份了。</item>
+    </string-array>
+</resources>
