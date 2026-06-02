@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
-import android.provider.MediaStore
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.ImageButton
@@ -18,7 +17,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import java.io.File
@@ -51,6 +49,7 @@ class AlbumTabController(
     private val decodeExecutor = Executors.newSingleThreadExecutor()
     private val thumbCache = android.util.LruCache<String, Bitmap>(24)
 
+    private var pendingCaptureFile: File? = null
     private var pendingCaptureUri: Uri? = null
     private val photoDeleteHelper = PhotoDeleteHelper.Helper(activity)
 
@@ -63,16 +62,23 @@ class AlbumTabController(
     }
 
     private val takePictureLauncher = activity.registerForActivityResult(
-        ActivityResultContracts.TakePicture(),
-    ) { success ->
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val file = pendingCaptureFile
         val uri = pendingCaptureUri
+        pendingCaptureFile = null
         pendingCaptureUri = null
-        if (success && uri != null) {
-            importFromUri(uri, eraseGallerySource = false)
-            try {
-                activity.contentResolver.delete(uri, null, null)
-            } catch (_: Exception) { }
-        }
+        QueenCameraCapture.handleCaptureResult(
+            activity,
+            result.resultCode,
+            result.data,
+            file,
+            uri,
+            onSuccess = { bytes -> importFromBytes(bytes) },
+            onFailure = {
+                Toast.makeText(activity, R.string.album_capture_failed, Toast.LENGTH_SHORT).show()
+            },
+        )
     }
 
     private val cameraPermissionLauncher = activity.registerForActivityResult(
@@ -134,26 +140,8 @@ class AlbumTabController(
             .show()
     }
 
-    private fun isCameraCaptureAvailable(): Boolean {
-        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        return intent.resolveActivity(activity.packageManager) != null
-    }
-
-    private fun buildCaptureIntent(outputUri: Uri): Intent {
-        return Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
-            putExtra(MediaStore.EXTRA_OUTPUT, outputUri)
-            addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            clipData = android.content.ClipData.newUri(
-                activity.contentResolver,
-                "capture",
-                outputUri,
-            )
-        }
-    }
-
-    private fun canHandleCaptureIntent(outputUri: Uri): Boolean {
-        return buildCaptureIntent(outputUri).resolveActivity(activity.packageManager) != null
-    }
+    private fun isCameraCaptureAvailable(): Boolean =
+        QueenCameraCapture.isCaptureAvailable(activity)
 
     private fun requestCameraAndCapture() {
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) ==
@@ -166,23 +154,33 @@ class AlbumTabController(
     }
 
     private fun launchCamera() {
-        val captureFile = File(activity.cacheDir, "queen_capture_${System.currentTimeMillis()}.jpg")
-        val uri = FileProvider.getUriForFile(
-            activity,
-            "${activity.packageName}.fileprovider",
-            captureFile,
-        )
-        if (!canHandleCaptureIntent(uri)) {
+        val (captureFile, uri) = QueenCameraCapture.createOutputFile(activity)
+        val intent = QueenCameraCapture.launchableCaptureIntent(activity, uri)
+        if (intent == null) {
             Toast.makeText(activity, R.string.album_camera_unavailable, Toast.LENGTH_LONG).show()
             return
         }
+        pendingCaptureFile = captureFile
         pendingCaptureUri = uri
         try {
-            takePictureLauncher.launch(uri)
+            takePictureLauncher.launch(intent)
         } catch (_: ActivityNotFoundException) {
+            pendingCaptureFile = null
             pendingCaptureUri = null
+            QueenCameraCapture.cleanupCapture(activity, captureFile, uri)
             Toast.makeText(activity, R.string.album_camera_unavailable, Toast.LENGTH_LONG).show()
         }
+    }
+
+    private fun importFromBytes(bytes: ByteArray) {
+        val id = QueenAlbumVault.importPlainBytes(activity, bytes)
+        if (id == null) {
+            Toast.makeText(activity, R.string.album_import_failed, Toast.LENGTH_SHORT).show()
+            return
+        }
+        preloadThumbnail(id)
+        refreshGrid()
+        Toast.makeText(activity, R.string.album_import_ok, Toast.LENGTH_SHORT).show()
     }
 
     private fun importFromUri(uri: Uri, eraseGallerySource: Boolean) {

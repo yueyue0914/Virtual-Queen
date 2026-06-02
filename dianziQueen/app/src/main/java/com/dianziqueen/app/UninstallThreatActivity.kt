@@ -58,8 +58,12 @@ class UninstallThreatActivity : AppCompatActivity() {
             },
         )
 
-        findViewById<TextView>(R.id.tvUninstallThreatTitle).text = hon(R.string.uninstall_threat_screen_title)
-        findViewById<TextView>(R.id.tvUninstallThreatBody).text = hon(R.string.uninstall_threat_screen_body)
+        findViewById<TextView>(R.id.tvUninstallThreatTitle).text =
+            intent.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() }
+                ?: hon(R.string.uninstall_threat_screen_title)
+        findViewById<TextView>(R.id.tvUninstallThreatBody).text =
+            intent.getStringExtra(EXTRA_BODY)?.takeIf { it.isNotBlank() }
+                ?: hon(R.string.uninstall_threat_screen_body)
         findViewById<Button>(R.id.btnUninstallSurrender).text = hon(R.string.uninstall_threat_surrender)
         findViewById<Button>(R.id.btnUninstallSurrender).setOnClickListener {
             vibrating = false
@@ -95,5 +99,7 @@ class UninstallThreatActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_AUTO_FINISH_MS = "auto_finish_ms"
+        const val EXTRA_TITLE = "extra_title"
+        const val EXTRA_BODY = "extra_body"
     }
 }

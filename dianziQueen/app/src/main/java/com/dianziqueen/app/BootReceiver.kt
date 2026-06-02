@@ -60,5 +60,7 @@ object Prefs {
     const val LAST_UNINSTALL_ATTEMPT_AT = "last_uninstall_attempt_at"
     /** 已为哪次尝试时间戳执行过开机惩罚（避免重复）。 */
     const val BOOT_PUNISH_FOR_ATTEMPT_AT = "boot_punish_for_attempt_at"
+    /** 最强控制：拦截系统设置（默认开启，可在 App 设置页用密码关闭）。 */
+    const val STRONG_CONTROL_ENABLED = "strong_control_enabled"
     const val QUEEN_HONORIFIC_PRESET = "queen_honorific_preset"
 }

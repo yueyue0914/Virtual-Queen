@@ -54,37 +54,25 @@ class DailySelfieDemandActivity : AppCompatActivity() {
     }
 
     private val takePictureLauncher = registerForActivityResult(
-        ActivityResultContracts.TakePicture(),
-    ) { success ->
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
         DailySelfieEnforcement.cameraCaptureInProgress = false
         val file = pendingCaptureFile
         val uri = pendingCaptureUri
         pendingCaptureFile = null
         pendingCaptureUri = null
-        if (!success || file == null || !file.exists() || file.length() <= 0L) {
-            Toast.makeText(this, R.string.daily_selfie_capture_failed, Toast.LENGTH_SHORT).show()
-            scheduleRelaunch(150L)
-            return@registerForActivityResult
-        }
-        val bytes = try {
-            file.readBytes()
-        } catch (_: Exception) {
-            null
-        }
-        try {
-            file.delete()
-        } catch (_: Exception) { }
-        if (uri != null) {
-            try {
-                contentResolver.delete(uri, null, null)
-            } catch (_: Exception) { }
-        }
-        if (bytes == null || bytes.isEmpty()) {
-            Toast.makeText(this, R.string.daily_selfie_capture_failed, Toast.LENGTH_SHORT).show()
-            scheduleRelaunch(150L)
-            return@registerForActivityResult
-        }
-        importBytesAndFinish(bytes, SubmissionSource.CAMERA)
+        QueenCameraCapture.handleCaptureResult(
+            this,
+            result.resultCode,
+            result.data,
+            file,
+            uri,
+            onSuccess = { bytes -> importBytesAndFinish(bytes, SubmissionSource.CAMERA) },
+            onFailure = {
+                Toast.makeText(this, R.string.daily_selfie_capture_failed, Toast.LENGTH_SHORT).show()
+                scheduleRelaunch(150L)
+            },
+        )
     }
 
     private val pickImageLauncher = registerForActivityResult(
@@ -221,7 +209,8 @@ class DailySelfieDemandActivity : AppCompatActivity() {
 
     private fun launchCamera() {
         val (file, uri) = QueenCameraCapture.createOutputFile(this, "queen_daily_selfie")
-        if (!QueenCameraCapture.canCapture(this, uri)) {
+        val intent = QueenCameraCapture.launchableCaptureIntent(this, uri)
+        if (intent == null) {
             Toast.makeText(this, R.string.daily_selfie_no_camera, Toast.LENGTH_LONG).show()
             return
         }
@@ -229,7 +218,7 @@ class DailySelfieDemandActivity : AppCompatActivity() {
         pendingCaptureUri = uri
         DailySelfieEnforcement.cameraCaptureInProgress = true
         handler.removeCallbacks(relaunchRunnable)
-        takePictureLauncher.launch(uri)
+        takePictureLauncher.launch(intent)
     }
 
     private fun launchGalleryPick() {

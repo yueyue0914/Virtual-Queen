@@ -2,6 +2,7 @@ package com.dianziqueen.app
 
 import android.os.Bundle
 import android.widget.Button
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -17,6 +18,8 @@ class QueenSettingsActivity : AppCompatActivity() {
     private lateinit var releaseButton: Button
     private lateinit var honorificCurrentText: TextView
     private lateinit var honorificChangeButton: Button
+    private lateinit var strongControlStatusText: TextView
+    private lateinit var strongControlDisableButton: Button
 
     private lateinit var floatStyleOptions: List<FloatStyleOption>
 
@@ -35,6 +38,10 @@ class QueenSettingsActivity : AppCompatActivity() {
         releaseButton = findViewById(R.id.settingsReleaseButton)
         honorificCurrentText = findViewById(R.id.settingsHonorificCurrentText)
         honorificChangeButton = findViewById(R.id.settingsHonorificChangeButton)
+        strongControlStatusText = findViewById(R.id.settingsStrongControlStatusText)
+        strongControlDisableButton = findViewById(R.id.settingsStrongControlDisableButton)
+
+        strongControlDisableButton.setOnClickListener { confirmDisableStrongControl() }
 
         honorificChangeButton.setOnClickListener {
             QueenHonorific.showPicker(this) {
@@ -70,6 +77,7 @@ class QueenSettingsActivity : AppCompatActivity() {
         refreshReleaseTexts()
         applyHonorificToStaticLabels()
         refreshFloatAvatarStyleLabels()
+        refreshStrongControlSection()
     }
 
     override fun onResume() {
@@ -81,6 +89,51 @@ class QueenSettingsActivity : AppCompatActivity() {
         refreshReleaseTexts()
         applyHonorificToStaticLabels()
         refreshFloatAvatarStyleLabels()
+        refreshStrongControlSection()
+    }
+
+    private fun refreshStrongControlSection() {
+        val activated = getSharedPreferences(Prefs.NAME, MODE_PRIVATE)
+            .getBoolean(Prefs.ACTIVATED, false)
+        val enabled = SettingsLockGuard.isStrongControlEnabled(this)
+        strongControlStatusText.text = if (enabled) {
+            hon(R.string.settings_strong_control_status_on)
+        } else {
+            hon(R.string.settings_strong_control_status_off)
+        }
+        strongControlDisableButton.visibility =
+            if (activated && enabled) android.view.View.VISIBLE else android.view.View.GONE
+    }
+
+    private fun confirmDisableStrongControl() {
+        val input = EditText(this).apply {
+            hint = getString(R.string.settings_strong_control_password_hint)
+            setSingleLine()
+        }
+        AlertDialog.Builder(this)
+            .setTitle(hon(R.string.settings_strong_control_disable_title))
+            .setMessage(hon(R.string.settings_strong_control_disable_message))
+            .setView(input)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val pwd = input.text?.toString().orEmpty()
+                if (SettingsLockGuard.verifyDisablePassword(pwd)) {
+                    SettingsLockGuard.disableStrongControl(this)
+                    Toast.makeText(
+                        this,
+                        hon(R.string.settings_strong_control_disabled_toast),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                    refreshStrongControlSection()
+                } else {
+                    Toast.makeText(
+                        this,
+                        hon(R.string.settings_strong_control_password_wrong),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun applyHonorificToStaticLabels() {

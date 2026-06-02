@@ -18,7 +18,8 @@ object QueenAccessibilityHelper {
 
     fun isServiceEnabled(context: Context): Boolean {
         if (isServiceEnabledViaAccessibilityManager(context)) return true
-        return isServiceEnabledViaSecureSettings(context)
+        if (isServiceEnabledViaSecureSettings(context)) return true
+        return isServiceEnabledViaGlobalSwitch(context)
     }
 
     private fun isServiceEnabledViaAccessibilityManager(context: Context): Boolean {
@@ -65,6 +66,30 @@ object QueenAccessibilityHelper {
             }
         }
         return false
+    }
+
+    /** 华米 OV 等：总开关已开且 enabled_services 含本包名，但 Manager 列表未及时刷新。 */
+    private fun isServiceEnabledViaGlobalSwitch(context: Context): Boolean {
+        if (!RomPermissionUtils.isDomesticRom()) return false
+        val enabled = try {
+            Settings.Secure.getInt(
+                context.contentResolver,
+                Settings.Secure.ACCESSIBILITY_ENABLED,
+                0,
+            ) == 1
+        } catch (_: Exception) {
+            return false
+        }
+        if (!enabled) return false
+        val services = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+        ).orEmpty()
+        if (services.isBlank()) return false
+        val pkg = context.packageName
+        val token = QueenAccessibilityService::class.java.simpleName
+        return services.contains(pkg, ignoreCase = true) &&
+            services.contains(token, ignoreCase = true)
     }
 
     /** 系统已勾选且服务进程已连接（最佳运行态）。 */

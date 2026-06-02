@@ -57,6 +57,7 @@ class PermissionCheckActivity : AppCompatActivity() {
                 name = getString(R.string.perm_check_item_overlay),
                 isGranted = FloatingWindowPermissionHelper.hasPermission(context),
                 critical = true,
+                note = romProbeNote(context, "overlay"),
                 fixAction = PermissionStatus.FixAction.OVERLAY,
             ),
             PermissionStatus(
@@ -76,8 +77,15 @@ class PermissionCheckActivity : AppCompatActivity() {
             PermissionStatus(
                 id = "notifications",
                 name = getString(R.string.perm_check_item_notifications),
-                isGranted = NotificationHelper.hasEarlyNotificationsReady(context),
+                isGranted = NotificationHelper.hasNotificationPermissionReady(context),
                 critical = true,
+                note = if (NotificationHelper.hasNotificationPermissionReady(context) &&
+                    !NotificationHelper.isTeasingChannelImportanceAdequate(context)
+                ) {
+                    hon(R.string.perm_channel_not_high)
+                } else {
+                    ""
+                },
                 fixAction = PermissionStatus.FixAction.NOTIFICATIONS,
             ),
             PermissionStatus(
@@ -92,6 +100,7 @@ class PermissionCheckActivity : AppCompatActivity() {
                 name = getString(R.string.perm_check_item_write_settings),
                 isGranted = QueenPrivilegeAuditor.canWriteSystemSettings(context),
                 critical = true,
+                note = romProbeNote(context, "write_settings"),
                 fixAction = PermissionStatus.FixAction.WRITE_SETTINGS,
             ),
             PermissionStatus(
@@ -99,6 +108,7 @@ class PermissionCheckActivity : AppCompatActivity() {
                 name = getString(R.string.perm_check_item_battery),
                 isGranted = QueenBatteryHelper.isExemptFromBatteryOptimizations(context),
                 critical = true,
+                note = romProbeNote(context, "battery"),
                 fixAction = PermissionStatus.FixAction.BATTERY,
             ),
             PermissionStatus(
@@ -159,6 +169,17 @@ class PermissionCheckActivity : AppCompatActivity() {
         return list
     }
 
+    private fun romProbeNote(context: Context, id: String): String {
+        val key = RomPermissionProbe.confirmKeyForPermissionId(id) ?: return ""
+        return when {
+            RomPermissionProbe.isUserConfirmed(context, key) ->
+                getString(R.string.perm_check_rom_confirmed_note)
+            RomPermissionProbe.needsManualConfirmHint(context, id) ->
+                getString(R.string.perm_check_rom_long_press_confirm)
+            else -> ""
+        }
+    }
+
     private fun renderPermissionList(checks: List<PermissionStatus>) {
         binding.permissionListContainer.removeAllViews()
         val inflater = LayoutInflater.from(this)
@@ -197,8 +218,28 @@ class PermissionCheckActivity : AppCompatActivity() {
                 row.setOnClickListener { openFix(item.fixAction) }
             }
 
+            if (RomPermissionProbe.needsManualConfirmHint(this, item.id)) {
+                row.setOnLongClickListener {
+                    offerManualConfirm(item.id)
+                    true
+                }
+            }
+
             binding.permissionListContainer.addView(row)
         }
+    }
+
+    private fun offerManualConfirm(permissionId: String) {
+        val key = RomPermissionProbe.confirmKeyForPermissionId(permissionId) ?: return
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(R.string.perm_check_manual_confirm_title)
+            .setMessage(R.string.perm_check_manual_confirm_message)
+            .setPositiveButton(R.string.perm_check_manual_confirm_yes) { _, _ ->
+                RomPermissionProbe.setUserConfirmed(this, key, true)
+                checkAllPermissions()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun updateSummary(checks: List<PermissionStatus>) {

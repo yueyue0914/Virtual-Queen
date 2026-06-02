@@ -1,6 +1,5 @@
 package com.dianziqueen.app
 
-import android.app.AppOpsManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -13,7 +12,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
 /**
- * 悬浮窗权限：标准 [Settings.canDrawOverlays] + 小米/红米 AppOps 补充 + 引导弹窗。
+ * 悬浮窗权限：标准 API + AppOps 双通道（华米 OV 等国产 ROM 误报补充）+ 引导弹窗。
  */
 object FloatingWindowPermissionHelper {
 
@@ -21,13 +20,9 @@ object FloatingWindowPermissionHelper {
     private const val PREF_OVERLAY_GUIDE_LAST_MS = "queen_overlay_guide_last_ms"
     private const val OVERLAY_GUIDE_COOLDOWN_MS = 6 * 60 * 60 * 1000L
 
-    /** 是否有悬浮窗权限（适配小米/红米）。 */
-    fun hasPermission(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
-        if (Settings.canDrawOverlays(context)) return true
-        if (!isXiaomiFamily()) return false
-        return isXiaomiOverlayGranted(context)
-    }
+    /** 是否有悬浮窗权限（适配华米 OV 等国产 ROM）。 */
+    fun hasPermission(context: Context): Boolean =
+        RomPermissionProbe.isOverlayGranted(context)
 
     fun isXiaomiFamily(): Boolean = isXiaomiDevice()
 
@@ -39,31 +34,6 @@ object FloatingWindowPermissionHelper {
             brand.contains("poco") ||
             manufacturer.contains("xiaomi") ||
             manufacturer.contains("redmi")
-    }
-
-    /** 小米/红米：Settings 误报时用 AppOps 再确认。 */
-    private fun isXiaomiOverlayGranted(context: Context): Boolean {
-        return try {
-            val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-            val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                appOps.unsafeCheckOpNoThrow(
-                    AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW,
-                    context.applicationInfo.uid,
-                    context.packageName,
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                appOps.checkOpNoThrow(
-                    "android:system_alert_window",
-                    context.applicationInfo.uid,
-                    context.packageName,
-                )
-            }
-            mode == AppOpsManager.MODE_ALLOWED
-        } catch (e: Exception) {
-            Log.w(TAG, "AppOps overlay check failed: ${e.message}")
-            false
-        }
     }
 
     fun requestPermission(activity: AppCompatActivity) {

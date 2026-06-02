@@ -27,10 +27,13 @@ object NotificationHelper {
     fun areAppNotificationsEnabled(context: Context): Boolean =
         NotificationManagerCompat.from(context).areNotificationsEnabled()
 
-    /** 上交权限前须就绪：运行时通知权 + 总开关 + 渠道重要性。 */
+    /** 上交/激活门槛：运行时通知权 + 总开关（不含渠道重要性，避免「已授权仍被拦」）。 */
+    fun hasNotificationPermissionReady(context: Context): Boolean =
+        isPostNotificationsGranted(context) && areAppNotificationsEnabled(context)
+
+    /** 完整就绪：运行时通知权 + 总开关 + 渠道重要性（用于激活后横幅提示）。 */
     fun hasEarlyNotificationsReady(context: Context): Boolean =
-        isPostNotificationsGranted(context) &&
-            areAppNotificationsEnabled(context) &&
+        hasNotificationPermissionReady(context) &&
             isTeasingChannelImportanceAdequate(context)
 
     /**

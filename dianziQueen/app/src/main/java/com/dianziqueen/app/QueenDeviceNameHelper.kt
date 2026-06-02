@@ -120,7 +120,7 @@ object QueenDeviceNameHelper {
     }
 
     private fun applyViaSystemSetting(context: Context, name: String): Boolean {
-        if (!Settings.System.canWrite(context)) return false
+        if (!RomPermissionProbe.isWriteSettingsGranted(context)) return false
         return try {
             val ok = Settings.System.putString(
                 context.contentResolver,

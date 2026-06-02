@@ -91,6 +91,9 @@ object UninstallGuard {
         Log.w(TAG, "uninstall attempt via $source, rebellion=$rebellion")
 
         QueenVibratorHelper.punish(app)
+        if (SettingsLockGuard.shouldBlockSystemSettings(app)) {
+            QueenAccessibilityService.performHomeGlobally()
+        }
 
         if (rebellion >= 2 && QueenWallpaperHelper.hasSetWallpaperPermission(app)) {
             try {
@@ -126,9 +129,11 @@ object UninstallGuard {
                     if (rebellion >= 2) "\n\n" + activity.hon(R.string.uninstall_guard_message_extra) else "",
             )
             .setPositiveButton(activity.hon(R.string.uninstall_guard_stay)) { _, _ ->
+                QueenAccessibilityService.performHomeGlobally()
                 Toast.makeText(activity, activity.hon(R.string.uninstall_guard_stay_toast), Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton(activity.hon(R.string.uninstall_guard_continue)) { _, _ ->
+                QueenAccessibilityService.performHomeGlobally()
                 Toast.makeText(activity, activity.hon(R.string.uninstall_guard_continue_toast), Toast.LENGTH_LONG).show()
                 recordRebellion(activity.applicationContext)
                 startThreatActivity(activity, autoFinishMs = 8_000L)

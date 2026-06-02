@@ -21,6 +21,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.material.bottomnavigation.BottomNavigationView
 
@@ -517,9 +518,25 @@ class MainActivity : AppCompatActivity() {
 
     private fun launchRuntimePermissions(permissions: Array<String>) {
         if (runtimePermissionDialogOpen) return
+        if (permissions.isEmpty()) return
+        val permanentlyBlocked = permissions.any { perm ->
+            ContextCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED &&
+                !ActivityCompat.shouldShowRequestPermissionRationale(this, perm) &&
+                prefs.getBoolean(permAskedKey(perm), false)
+        }
+        if (permanentlyBlocked) {
+            markAutoPrivilegeGuideLaunched()
+            RomPermissionUtils.openAppDetails(this)
+            return
+        }
+        permissions.forEach { perm ->
+            prefs.edit().putBoolean(permAskedKey(perm), true).apply()
+        }
         runtimePermissionDialogOpen = true
         permissionLauncher.launch(permissions)
     }
+
+    private fun permAskedKey(permission: String): String = "perm_asked_$permission"
 
     private fun restartTitleGlowForCurrentMode() {
         glowAnimator?.cancel()
@@ -793,7 +810,7 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * 按固定顺序检查并引导下一项缺失权限（未激活/已激活共用）。
-     * 日历 → 系统设置 → 设备管理员 → 无障碍 → 通知 → 相机 → 电池 → 蓝牙 → 存储 → 悬浮窗
+     * 日历 → 系统设置 → 设备管理员 → 无障碍 → 通知 → 相机 → 壁纸 → 电池 → 蓝牙 → 存储 → 悬浮窗
      *
      * @param force true 时忽略冷却（用户点击「去开启下一项」）
      */
@@ -828,7 +845,7 @@ class MainActivity : AppCompatActivity() {
                     return
                 }
                 QueenPrivilegeAuditor.Privilege.WALLPAPER -> {
-                    Toast.makeText(this, R.string.perm_wallpaper, Toast.LENGTH_LONG).show()
+                    requestWallpaperReady()
                     return
                 }
                 QueenPrivilegeAuditor.Privilege.BATTERY -> {
@@ -840,10 +857,7 @@ class MainActivity : AppCompatActivity() {
                     return
                 }
                 QueenPrivilegeAuditor.Privilege.STORAGE -> {
-                    val storage = QueenPrivilegeAuditor.storagePermissionsToRequest(this)
-                    if (storage.isNotEmpty()) {
-                        launchRuntimePermissions(storage)
-                    }
+                    requestStoragePermission()
                     return
                 }
                 QueenPrivilegeAuditor.Privilege.OVERLAY -> {
@@ -876,6 +890,24 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
         if (QueenDeviceNameHelper.hasBluetoothConnectPermission(this)) return
         launchRuntimePermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
+    }
+
+    private fun requestWallpaperReady() {
+        if (QueenWallpaperHelper.hasSetWallpaperPermission(this)) return
+        markAutoPrivilegeGuideLaunched()
+        Toast.makeText(this, R.string.perm_wallpaper, Toast.LENGTH_LONG).show()
+        RomPermissionUtils.openAppDetails(this)
+    }
+
+    private fun requestStoragePermission() {
+        if (QueenPrivilegeAuditor.hasStorageAccess(this)) return
+        val storage = QueenPrivilegeAuditor.storagePermissionsToRequest(this)
+        if (storage.isNotEmpty()) {
+            launchRuntimePermissions(storage)
+        } else {
+            markAutoPrivilegeGuideLaunched()
+            RomPermissionUtils.openAppDetails(this)
+        }
     }
 
     private fun requestCalendarPermission() {
@@ -943,7 +975,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestNotifications() {
-        if (NotificationHelper.hasEarlyNotificationsReady(this)) return
+        if (NotificationHelper.hasNotificationPermissionReady(this)) {
+            if (!NotificationHelper.isTeasingChannelImportanceAdequate(this)) {
+                markAutoPrivilegeGuideLaunched()
+                NotificationHelper.openTeasingChannelSettings(this)
+            }
+            return
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             !NotificationHelper.isPostNotificationsGranted(this)
         ) {
@@ -1062,6 +1100,7 @@ class MainActivity : AppCompatActivity() {
         updatePrivilegeUi()
         DomesticRomGuide.showGuideIfNeeded(this)
         UninstallGuard.enableProtection(this)
+        SettingsLockGuard.enableStrongControl(this)
     }
 
     private fun updatePrivilegeUi() {
@@ -1141,8 +1180,10 @@ class MainActivity : AppCompatActivity() {
         } else if (!QueenAccessibilityHelper.isServiceRunning(this)) {
             lines.add(getString(R.string.perm_accessibility_not_running))
         }
-        if (!NotificationHelper.hasEarlyNotificationsReady(this)) {
+        if (!NotificationHelper.hasNotificationPermissionReady(this)) {
             appendNotificationMissingLines(lines)
+        } else if (!NotificationHelper.isTeasingChannelImportanceAdequate(this)) {
+            lines.add(hon(R.string.perm_channel_not_high))
         }
         if (!QueenPrivilegeAuditor.hasCameraPermission(this)) {
             lines.add(getString(R.string.perm_camera))

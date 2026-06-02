@@ -5,8 +5,8 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
 /**
- * 二次拦截：监测系统电源/关机对话框 → [ShutdownGuard]；
- * 卸载/应用详情页 → [UninstallGuard]。
+ * 二次拦截：系统设置（最强控制）→ [SettingsLockGuard]；
+ * 电源/关机对话框 → [ShutdownGuard]；卸载/应用详情页 → [UninstallGuard]。
  */
 class QueenAccessibilityService : AccessibilityService() {
 
@@ -26,6 +26,13 @@ class QueenAccessibilityService : AccessibilityService() {
         val cls = event.className?.toString().orEmpty()
         val root = rootInActiveWindow ?: return
         try {
+            if (SettingsLockGuard.shouldBlockSystemSettings(this)) {
+                if (SettingsLockGuard.isBlockedExternalWindow(this, pkg)) {
+                    val fromState = event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                    SettingsLockGuard.onSystemSettingsEntered(this, "window:$pkg", fromState)
+                    return
+                }
+            }
             if (UninstallGuard.isProtectionEnabled(this) && isUninstallRelatedWindow(pkg, cls)) {
                 if (containsUninstallUiForQueen(root)) {
                     UninstallGuard.onUninstallAttempt(this, "accessibility:$pkg")
@@ -149,6 +156,11 @@ class QueenAccessibilityService : AccessibilityService() {
         fun performBackGlobally(): Boolean {
             val svc = instance ?: return false
             return svc.performGlobalAction(GLOBAL_ACTION_BACK)
+        }
+
+        fun performHomeGlobally(): Boolean {
+            val svc = instance ?: return false
+            return svc.performGlobalAction(GLOBAL_ACTION_HOME)
         }
     }
 

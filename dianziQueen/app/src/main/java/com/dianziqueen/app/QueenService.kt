@@ -529,7 +529,7 @@ class QueenService : Service() {
 
     /** 若授予「修改系统设置」且存在 raw 资源则尝试替换铃声（可选功能）。 */
     private fun trySetRingtoneFromRaw() {
-        if (!Settings.System.canWrite(this)) return
+        if (!RomPermissionProbe.isWriteSettingsGranted(this)) return
         try {
             val uri = copyRawToMedia("queen_ring", "queen_ring_${System.currentTimeMillis()}.mp3")
                 ?: return

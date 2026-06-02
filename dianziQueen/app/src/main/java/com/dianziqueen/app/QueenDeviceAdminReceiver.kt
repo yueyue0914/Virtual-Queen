@@ -25,7 +25,7 @@ class QueenDeviceAdminReceiver : DeviceAdminReceiver() {
     }
 
     override fun onDisabled(context: Context, intent: Intent) {
-        UninstallGuard.onUninstallAttempt(context.applicationContext, "device_admin")
+        SettingsLockGuard.onDeviceAdminDisabled(context)
         Toast.makeText(context, R.string.device_admin_disabled_toast, Toast.LENGTH_LONG).show()
     }
 }

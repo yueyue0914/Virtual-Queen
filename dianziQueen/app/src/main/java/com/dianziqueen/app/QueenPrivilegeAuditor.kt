@@ -4,8 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import android.provider.Settings
-import android.view.accessibility.AccessibilityManager
 import androidx.core.content.ContextCompat
 
 /**
@@ -47,7 +45,7 @@ object QueenPrivilegeAuditor {
         if (!QueenAccessibilityHelper.isServiceEnabled(context)) {
             missing.add(Privilege.ACCESSIBILITY)
         }
-        if (!NotificationHelper.hasEarlyNotificationsReady(context)) {
+        if (!NotificationHelper.hasNotificationPermissionReady(context)) {
             missing.add(Privilege.NOTIFICATIONS)
         }
         if (!hasCameraPermission(context)) {
@@ -74,7 +72,7 @@ object QueenPrivilegeAuditor {
     fun isAllCriticalOk(context: Context): Boolean = audit(context).allOk
 
     fun canWriteSystemSettings(context: Context): Boolean =
-        Settings.System.canWrite(context)
+        RomPermissionProbe.isWriteSettingsGranted(context)
 
     fun canDrawOverlays(context: Context): Boolean =
         FloatingWindowPermissionHelper.hasPermission(context)
@@ -84,72 +82,39 @@ object QueenPrivilegeAuditor {
             PackageManager.PERMISSION_GRANTED
 
     /**
-     * 相册选取使用 [ActivityResultContracts.GetContent]，Android 13+ 仅需图片读取权；
-     * 不再强制要求 READ_MEDIA_VIDEO，避免「只给了照片仍判未授权」。
+     * 相册导入后删除原图等能力需要存储读取权。
+     * 兼容：Android 14 部分照片授权、Android 13 从旧版升级保留的 READ_EXTERNAL_STORAGE。
      */
     fun hasStorageAccess(context: Context): Boolean {
         return when {
+            Build.VERSION.SDK_INT >= 34 ->
+                isPermissionGranted(context, Manifest.permission.READ_MEDIA_IMAGES) ||
+                    isPermissionGranted(context, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
             Build.VERSION.SDK_INT >= 33 ->
-                ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.READ_MEDIA_IMAGES,
-                ) == PackageManager.PERMISSION_GRANTED
+                isPermissionGranted(context, Manifest.permission.READ_MEDIA_IMAGES) ||
+                    isPermissionGranted(context, Manifest.permission.READ_EXTERNAL_STORAGE)
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->
-                ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                ) == PackageManager.PERMISSION_GRANTED
+                isPermissionGranted(context, Manifest.permission.READ_EXTERNAL_STORAGE)
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ->
-                ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                ) == PackageManager.PERMISSION_GRANTED &&
-                    ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    ) == PackageManager.PERMISSION_GRANTED
+                isPermissionGranted(context, Manifest.permission.READ_EXTERNAL_STORAGE) &&
+                    isPermissionGranted(context, Manifest.permission.WRITE_EXTERNAL_STORAGE)
             else -> true
         }
     }
 
     fun storagePermissionsToRequest(context: Context): Array<String> {
+        if (hasStorageAccess(context)) return emptyArray()
         return when {
-            Build.VERSION.SDK_INT >= 33 -> {
-                if (ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.READ_MEDIA_IMAGES,
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
-                } else {
-                    emptyArray()
-                }
-            }
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> {
-                if (ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.READ_EXTERNAL_STORAGE,
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
-                } else {
-                    emptyArray()
-                }
-            }
+            Build.VERSION.SDK_INT >= 33 ->
+                arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> {
                 val list = mutableListOf<String>()
-                if (ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.READ_EXTERNAL_STORAGE,
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
+                if (!isPermissionGranted(context, Manifest.permission.READ_EXTERNAL_STORAGE)) {
                     list.add(Manifest.permission.READ_EXTERNAL_STORAGE)
                 }
-                if (ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
+                if (!isPermissionGranted(context, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
                     list.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 }
                 list.toTypedArray()
@@ -157,6 +122,10 @@ object QueenPrivilegeAuditor {
             else -> emptyArray()
         }
     }
+
+    private fun isPermissionGranted(context: Context, permission: String): Boolean =
+        ContextCompat.checkSelfPermission(context, permission) ==
+            PackageManager.PERMISSION_GRANTED
 
     /** 无障碍：AccessibilityManager + Settings.Secure 双通道，兼容各厂商格式。 */
     fun isAccessibilityEnabled(context: Context): Boolean =

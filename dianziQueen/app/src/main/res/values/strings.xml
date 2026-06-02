@@ -69,6 +69,11 @@
     <string name="perm_check_manual_note">系统无法自动检测，请手动确认</string>
     <string name="perm_check_accessibility_not_running">已开启但未运行，请关闭后重新开启</string>
     <string name="perm_check_rom_extra_note">华米OV请点击下方「厂商完整引导」</string>
+    <string name="perm_check_rom_long_press_confirm">国产机若已在设置中开启但仍显示未授予，请长按此行手动确认</string>
+    <string name="perm_check_rom_confirmed_note">已通过手动确认（国产机系统无法自动识别时）</string>
+    <string name="perm_check_manual_confirm_title">确认已在系统设置中开启？</string>
+    <string name="perm_check_manual_confirm_message">部分华米OV机型无法被 App 自动识别。请确认你已在系统设置中开启该项，再点「我已开启」。</string>
+    <string name="perm_check_manual_confirm_yes">我已开启</string>
     <string name="perm_check_item_overlay">显示在其他应用上方</string>
     <string name="perm_check_item_accessibility">无障碍服务</string>
     <string name="perm_check_item_notifications">通知权限</string>
@@ -130,6 +135,7 @@
     <string name="album_key_failed">加密密钥生成失败</string>
     <string name="album_camera_denied">需要相机权限才能拍摄</string>
     <string name="album_camera_unavailable">当前设备没有可用的相机应用，请从相册选取</string>
+    <string name="album_capture_failed">拍摄失败，请重试或从相册选取</string>
     <string name="album_points_insufficient">积分不足（需要 %1$d，当前 %2$d）</string>
     <string name="album_view_confirm">查看清晰大图将消耗 %1$d 积分（当前 %2$d），是否继续？</string>
     <string name="album_viewer_title">清晰大图</string>

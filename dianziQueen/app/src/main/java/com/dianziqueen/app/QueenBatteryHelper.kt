@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.os.PowerManager
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -16,11 +15,8 @@ object QueenBatteryHelper {
 
     private const val NOTIFY_ID_BATTERY = 2006
 
-    fun isExemptFromBatteryOptimizations(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
-        val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return true
-        return pm.isIgnoringBatteryOptimizations(context.packageName)
-    }
+    fun isExemptFromBatteryOptimizations(context: Context): Boolean =
+        RomPermissionProbe.isBatteryExempt(context)
 
     /**
      * 优先弹出系统「允许忽略电池优化」；失败则打开电池优化列表或应用详情页。
