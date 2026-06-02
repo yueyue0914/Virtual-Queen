@@ -12,7 +12,10 @@ import androidx.appcompat.app.AppCompatActivity
 import java.io.File
 
 /**
- * 反卸载三层：心理威慑弹窗/全屏、技术阻拦（设备管理员+无障碍）、卸载后惩罚（外部档案）。
+ * 反卸载多层防御：
+ * 1. 心理威慑 — 分级弹窗 + 全屏 [UninstallThreatActivity]
+ * 2. 技术阻拦 — 无障碍检测卸载页 + 设备管理员 + 按 Home 打断
+ * 3. 卸载后惩罚 — 外部档案留存反抗次数，重装/开机追罚
  */
 object UninstallGuard {
 
@@ -20,13 +23,19 @@ object UninstallGuard {
     private const val GUARD_DIR_NAME = "Dianzinvwang"
     private const val GUARD_STATE_FILE = "queen_uninstall_guard.state"
     private const val DEBOUNCE_MS = 8_000L
+    /** 达到此次数后：强制全屏威胁、换壁纸、惩罚加重。 */
+    const val MAX_REBELLION_COUNT = 3
 
     private val handler = Handler(Looper.getMainLooper())
     private var lastAttemptRealtimeMs = 0L
 
+    /** 激活成功后启用（[enableProtection] 别名）。 */
+    fun enable(context: Context) = enableProtection(context)
+
     fun enableProtection(context: Context) {
         saveProtectedState(context, true)
         writeExternalState(context, rebellionCount = loadRebellionCount(context), protected = true)
+        Log.i(TAG, "卸载保护已启用")
     }
 
     fun disableProtection(context: Context) {
@@ -38,6 +47,8 @@ object UninstallGuard {
             .getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
             .getBoolean(Prefs.UNINSTALL_PROTECTED, false)
     }
+
+    fun getRebellionCount(context: Context): Int = loadRebellionCount(context)
 
     /** Application 冷启动：读取卸载后仍留存的外部档案，准备惩罚。 */
     fun onAppColdStart(context: Context) {
@@ -53,6 +64,31 @@ object UninstallGuard {
         Log.i(TAG, "detected prior rebellion=$rebellion from external guard file")
     }
 
+    /**
+     * 重装/回前台检查反抗记录（[applyReinstallPunishmentIfNeeded] 的便捷入口）。
+     * 有外部档案时走完整惩罚；否则仅追加威慑消息。
+     */
+    fun checkRebellionOnReinstall(context: Context) {
+        val app = context.applicationContext
+        val prefs = app.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(Prefs.HEAVY_PUNISHMENT_PENDING, false) &&
+            context is AppCompatActivity
+        ) {
+            applyReinstallPunishmentIfNeeded(context)
+            return
+        }
+        val count = loadRebellionCount(app)
+        if (count <= 0) return
+        handler.postDelayed({
+            val msg = if (context is AppCompatActivity) {
+                context.hon(R.string.uninstall_guard_reinstall_message, count)
+            } else {
+                app.getString(R.string.uninstall_guard_reinstall_message, count)
+            }
+            QueenMessageStore.appendQueenMessage(app, msg)
+        }, 2_000L)
+    }
+
     /** 激活后若曾卸载/反抗，执行第3层惩罚。 */
     fun applyReinstallPunishmentIfNeeded(activity: AppCompatActivity) {
         val prefs = activity.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
@@ -61,14 +97,26 @@ object UninstallGuard {
         val count = prefs.getInt(Prefs.REBELLION_COUNT, 0)
         QueenMessageStore.appendQueenMessage(
             activity,
-            "你又装回来了？第${count}次反抗我都记着呢。这次惩罚加倍，贱奴。",
+            activity.hon(R.string.uninstall_guard_reinstall_heavy, count),
         )
         enableProtection(activity)
         handler.postDelayed({
             if (!activity.isFinishing) {
-                startThreatActivity(activity, autoFinishMs = 6_500L)
+                startThreatActivity(
+                    activity,
+                    autoFinishMs = 6_500L,
+                    title = activity.hon(R.string.uninstall_threat_screen_title),
+                    body = activity.hon(R.string.uninstall_guard_message_3plus, count),
+                )
             }
         }, 600L)
+    }
+
+    /** 接管动画用：若存在历史反抗，插入一条终端警告日志。 */
+    fun rebellionTakeoverLogLine(context: Context): String? {
+        val count = loadRebellionCount(context.applicationContext)
+        if (count <= 0) return null
+        return context.hon(R.string.uninstall_guard_takeover_log, count)
     }
 
     /**
@@ -91,8 +139,11 @@ object UninstallGuard {
         Log.w(TAG, "uninstall attempt via $source, rebellion=$rebellion")
 
         QueenVibratorHelper.punish(app)
+        if (rebellion >= MAX_REBELLION_COUNT) {
+            QueenVibratorHelper.punish(app)
+        }
         if (SettingsLockGuard.shouldBlockSystemSettings(app)) {
-            QueenAccessibilityService.performHomeGlobally()
+            dismissUninstallUi()
         }
 
         if (rebellion >= 2 && QueenWallpaperHelper.hasSetWallpaperPermission(app)) {
@@ -103,50 +154,89 @@ object UninstallGuard {
             }
         }
 
+        val threatMs = when {
+            rebellion >= MAX_REBELLION_COUNT -> 12_000L
+            rebellion >= 2 -> 9_000L
+            else -> 8_000L
+        }
+
         handler.post {
             val activity = findActivityContext(context)
             if (activity != null && !activity.isFinishing) {
                 showUninstallWarningDialog(activity, rebellion)
             } else {
-                startThreatActivity(app, autoFinishMs = 9_000L)
+                startThreatActivity(app, autoFinishMs = threatMs)
+            }
+            if (rebellion >= MAX_REBELLION_COUNT) {
+                startThreatActivity(
+                    app,
+                    autoFinishMs = threatMs,
+                    title = app.getString(R.string.uninstall_threat_screen_title),
+                    body = app.getString(R.string.uninstall_guard_message_3plus, rebellion),
+                )
             }
         }
 
         handler.postDelayed({
             QueenMessageStore.appendQueenMessage(
                 app,
-                "贱奴，你居然敢尝试卸载我？胆子不小啊……（来源：$source）",
+                app.getString(R.string.uninstall_guard_attempt_message, rebellion),
             )
-        }, 800L)
+        }, 500L)
     }
 
     private fun showUninstallWarningDialog(activity: AppCompatActivity, rebellion: Int) {
         if (activity.isFinishing || activity.isDestroyed) return
+        val message = buildDialogMessage(activity, rebellion)
         AlertDialog.Builder(activity)
             .setTitle(activity.hon(R.string.uninstall_guard_title))
-            .setMessage(
-                activity.hon(R.string.uninstall_guard_message) +
-                    if (rebellion >= 2) "\n\n" + activity.hon(R.string.uninstall_guard_message_extra) else "",
-            )
+            .setMessage(message)
             .setPositiveButton(activity.hon(R.string.uninstall_guard_stay)) { _, _ ->
-                QueenAccessibilityService.performHomeGlobally()
-                Toast.makeText(activity, activity.hon(R.string.uninstall_guard_stay_toast), Toast.LENGTH_SHORT).show()
+                dismissUninstallUi()
+                Toast.makeText(
+                    activity,
+                    activity.hon(R.string.uninstall_guard_stay_toast),
+                    Toast.LENGTH_SHORT,
+                ).show()
             }
             .setNegativeButton(activity.hon(R.string.uninstall_guard_continue)) { _, _ ->
-                QueenAccessibilityService.performHomeGlobally()
-                Toast.makeText(activity, activity.hon(R.string.uninstall_guard_continue_toast), Toast.LENGTH_LONG).show()
-                recordRebellion(activity.applicationContext)
+                dismissUninstallUi()
+                Toast.makeText(
+                    activity,
+                    activity.hon(R.string.uninstall_guard_continue_toast),
+                    Toast.LENGTH_LONG,
+                ).show()
                 startThreatActivity(activity, autoFinishMs = 8_000L)
             }
             .setCancelable(false)
             .show()
     }
 
-    fun startThreatActivity(context: Context, autoFinishMs: Long = 8_000L) {
+    private fun buildDialogMessage(activity: AppCompatActivity, rebellion: Int): String {
+        val base = when {
+            rebellion <= 1 -> activity.hon(R.string.uninstall_guard_message_1)
+            rebellion == 2 -> activity.hon(R.string.uninstall_guard_message_2)
+            else -> activity.hon(R.string.uninstall_guard_message_3plus, rebellion)
+        }
+        return if (rebellion >= 2) {
+            base + "\n\n" + activity.hon(R.string.uninstall_guard_message_extra)
+        } else {
+            base
+        }
+    }
+
+    fun startThreatActivity(
+        context: Context,
+        autoFinishMs: Long = 8_000L,
+        title: String? = null,
+        body: String? = null,
+    ) {
         try {
             val intent = Intent(context, UninstallThreatActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 putExtra(UninstallThreatActivity.EXTRA_AUTO_FINISH_MS, autoFinishMs)
+                title?.let { putExtra(UninstallThreatActivity.EXTRA_TITLE, it) }
+                body?.let { putExtra(UninstallThreatActivity.EXTRA_BODY, it) }
             }
             context.startActivity(intent)
         } catch (e: Exception) {
@@ -158,12 +248,6 @@ object UninstallGuard {
         val prefs = context.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
         val count = prefs.getInt(Prefs.REBELLION_COUNT, 0) + 1
         prefs.edit().putInt(Prefs.REBELLION_COUNT, count).apply()
-        if (count >= 2) {
-            QueenMessageStore.appendQueenMessage(
-                context,
-                "你已经尝试反抗我${count}次了……很好，我记住你了。",
-            )
-        }
         return count
     }
 
@@ -246,6 +330,13 @@ object UninstallGuard {
             "开机了还想装没事？你昨晚那笔卸载账 Queen 还没算完呢，贱奴。",
         )
         handler.postDelayed({ startThreatActivity(app, autoFinishMs = 7_000L) }, 400L)
+    }
+
+    private fun dismissUninstallUi() {
+        // 优先返回，避免 performHome 跳到 HellPhone 等非系统默认桌面
+        if (!QueenAccessibilityService.performBackGlobally()) {
+            QueenAccessibilityService.performHomeGlobally()
+        }
     }
 
     private fun findActivityContext(context: Context): AppCompatActivity? {

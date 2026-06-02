@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/queenMenuDialogScrim"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#88000000"
+    android:clickable="true"
+    android:focusable="true">
+
+    <LinearLayout
+        android:id="@+id/queenMenuDialogPanel"
+        android:layout_width="240dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_queen_float_menu"
+        android:clickable="true"
+        android:focusable="true"
+        android:orientation="vertical"
+        android:padding="8dp">
+
+        <TextView
+            android:id="@+id/queenMenuDialogTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingBottom="6dp"
+            android:text="@string/queen_float_menu_title"
+            android:textColor="@color/crimson_glow"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/queenMenuConfess"
+            style="@style/QueenFloatMenuItem"
+            android:text="@string/queen_float_menu_confess" />
+
+        <TextView
+            android:id="@+id/queenMenuDaily"
+            style="@style/QueenFloatMenuItem"
+            android:text="@string/queen_float_menu_daily" />
+
+        <TextView
+            android:id="@+id/queenMenuPunish"
+            style="@style/QueenFloatMenuItem"
+            android:text="@string/queen_float_menu_punish" />
+
+        <TextView
+            android:id="@+id/queenMenuSelfie"
+            style="@style/QueenFloatMenuItem"
+            android:text="@string/queen_float_menu_selfie" />
+
+        <TextView
+            android:id="@+id/queenMenuMessages"
+            style="@style/QueenFloatMenuItem"
+            android:text="@string/queen_float_menu_messages" />
+
+        <TextView
+            android:id="@+id/queenMenuDismiss"
+            style="@style/QueenFloatMenuItem"
+            android:text="@string/queen_float_menu_dismiss" />
+    </LinearLayout>
+</FrameLayout>

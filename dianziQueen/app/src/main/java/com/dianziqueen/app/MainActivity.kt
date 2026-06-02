@@ -203,9 +203,9 @@ class MainActivity : AppCompatActivity() {
     private val takeoverSequenceLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            commitActivationAfterTakeover()
-        }
+        if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
+        if (prefs.getBoolean(Prefs.ACTIVATED, false)) return@registerForActivityResult
+        commitActivationAfterTakeover()
     }
 
     private val deviceAdminLauncher = registerForActivityResult(
@@ -430,15 +430,18 @@ class MainActivity : AppCompatActivity() {
         }
         if (pendingTakeoverAfterWriteSettings && canWriteSystemSettings()) {
             pendingTakeoverAfterWriteSettings = false
-            takeoverSequenceLauncher.launch(
-                Intent(this, TakeoverSequenceActivity::class.java)
-            )
+            if (!prefs.getBoolean(Prefs.ACTIVATED, false)) {
+                takeoverSequenceLauncher.launch(
+                    Intent(this, TakeoverSequenceActivity::class.java)
+                )
+            }
         }
         refreshCodeRainPhrases()
         updatePrivilegeUi()
         if (prefs.getBoolean(Prefs.ACTIVATED, false)) {
             ensureServiceRunning()
-            UninstallGuard.applyReinstallPunishmentIfNeeded(this)
+            QueenKeepAlive.ensureRunning(this, notifyIfRestored = false)
+            UninstallGuard.checkRebellionOnReinstall(this)
             if (!passDailySelfieGate()) return
             if (activatedPanel.visibility != View.VISIBLE) {
                 showActivatedState()
@@ -462,7 +465,7 @@ class MainActivity : AppCompatActivity() {
             }
             refreshMessagesUnreadBadge()
             schedulePrivilegeAuditOnAppOpen()
-            if (!FloatingWindowPermissionHelper.hasPermission(this)) {
+            if (DomesticRomGuide.needsGuide(this)) {
                 DomesticRomGuide.maybeShowOnResume(this)
             }
         } else {
@@ -1062,6 +1065,7 @@ class MainActivity : AppCompatActivity() {
 
     /** 口令已正确：进入接管动画（系统设置权限应已在上交前授予）。 */
     private fun beginTakeoverFlow() {
+        if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
         if (!canWriteSystemSettings()) {
             pendingTakeoverAfterWriteSettings = true
             Toast.makeText(this, R.string.toast_need_write_settings_before_takeover, Toast.LENGTH_LONG)
@@ -1094,13 +1098,14 @@ class MainActivity : AppCompatActivity() {
         showActivatedState()
         refreshProfilePanel()
         QueenService.start(this)
+        QueenKeepAlive.onActivated(this)
         QueenDeviceAdminHelper.applyQueenPolicies(this)
         ensureCalendarInjected()
         tryApplyQueenDeviceName()
         updatePrivilegeUi()
         DomesticRomGuide.showGuideIfNeeded(this)
         UninstallGuard.enableProtection(this)
-        SettingsLockGuard.enableStrongControl(this)
+        SettingsLockGuard.ensureStrongControlOnActivation(this)
     }
 
     private fun updatePrivilegeUi() {

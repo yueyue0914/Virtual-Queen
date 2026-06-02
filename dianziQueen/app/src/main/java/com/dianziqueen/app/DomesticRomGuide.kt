@@ -8,6 +8,16 @@ import androidx.appcompat.app.AppCompatActivity
 
 /**
  * 华米 OV 等国产 ROM 的 Queen 级权限强引导（悬浮窗 / 自启动 / 后台 / 电池）。
+ *
+ * 比单纯弹「去开悬浮窗」更完整：按 ROM 展示分步说明、检测当前缺失项、
+ * 一键跳转厂商权限中心，并支持分项设置（自启动 / 电池等）。
+ *
+ * 相关配合类：
+ * - [RomPermissionUtils] — 各品牌设置页精准跳转
+ * - [RomPermissionProbe] — AppOps 检测 + 自检页手动确认
+ * - [FloatingWindowPermissionHelper] — 悬浮窗检测
+ * - [QueenBatteryHelper] — 电池优化豁免
+ * - [PermissionCheckActivity] — 完整权限自检页
  */
 object DomesticRomGuide {
 
@@ -45,9 +55,18 @@ object DomesticRomGuide {
 
     fun isDomesticRom(): Boolean = detectRom() != RomVendor.OTHER
 
-    /** 激活后 / 接管动画结束：缺悬浮窗则弹窗。 */
+    /**
+     * 是否需要弹出国产 ROM 引导：缺悬浮窗，或国产机缺电池豁免（后台易被杀）。
+     */
+    fun needsGuide(context: Context): Boolean {
+        if (!FloatingWindowPermissionHelper.hasPermission(context)) return true
+        if (!isDomesticRom()) return false
+        return !QueenBatteryHelper.isExemptFromBatteryOptimizations(context)
+    }
+
+    /** 激活后 / 接管动画结束：缺关键 ROM 权限则弹窗。 */
     fun showGuideIfNeeded(activity: AppCompatActivity) {
-        if (FloatingWindowPermissionHelper.hasPermission(activity)) {
+        if (!needsGuide(activity)) {
             clearPending(activity)
             return
         }
@@ -59,7 +78,7 @@ object DomesticRomGuide {
      * @return 是否已展示引导
      */
     fun maybeShowOnResume(activity: AppCompatActivity): Boolean {
-        if (FloatingWindowPermissionHelper.hasPermission(activity)) {
+        if (!needsGuide(activity)) {
             clearPending(activity)
             return false
         }
@@ -96,12 +115,12 @@ object DomesticRomGuide {
         }
         AlertDialog.Builder(activity)
             .setTitle(activity.hon(R.string.domestic_rom_guide_title))
-            .setMessage(activity.hon(messageRes))
-            .setPositiveButton(R.string.domestic_rom_guide_go) { _, _ ->
-                openSettings(activity)
+            .setMessage(buildFullMessage(activity, messageRes))
+            .setPositiveButton(primaryActionLabel(activity)) { _, _ ->
+                openPrimarySettings(activity)
             }
-            .setNeutralButton(R.string.domestic_rom_guide_app_details) { _, _ ->
-                openAppDetails(activity)
+            .setNeutralButton(R.string.domestic_rom_guide_pick) { _, _ ->
+                showQuickJumpMenu(activity)
             }
             .setNegativeButton(R.string.domestic_rom_guide_later) { _, _ ->
                 Toast.makeText(
@@ -118,12 +137,87 @@ object DomesticRomGuide {
             .apply()
     }
 
+    /** 优先打开当前最缺的一项；悬浮窗仍缺时走综合引导（悬浮窗 + 厂商中心）。 */
+    fun openPrimarySettings(activity: AppCompatActivity) {
+        when {
+            !FloatingWindowPermissionHelper.hasPermission(activity) ->
+                RomPermissionUtils.openQueenPermissionHub(activity)
+            isDomesticRom() &&
+                !QueenBatteryHelper.isExemptFromBatteryOptimizations(activity) ->
+                QueenBatteryHelper.openBatteryExemptionSettings(activity)
+            isDomesticRom() -> {
+                if (!RomPermissionUtils.openRomExtraPermissionHub(activity)) {
+                    RomPermissionUtils.openAutoStartSettings(activity)
+                }
+            }
+            else -> RomPermissionUtils.openOverlaySettings(activity)
+        }
+    }
+
     fun openSettings(activity: AppCompatActivity) {
         RomPermissionUtils.openQueenPermissionHub(activity)
     }
 
-    private fun openAppDetails(context: Context) {
-        RomPermissionUtils.openAppDetails(context)
+    private fun showQuickJumpMenu(activity: AppCompatActivity) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        val labels = activity.resources.getStringArray(R.array.domestic_rom_guide_pick_items)
+        AlertDialog.Builder(activity)
+            .setTitle(activity.hon(R.string.domestic_rom_guide_pick_title))
+            .setItems(labels) { _, which ->
+                when (which) {
+                    0 -> RomPermissionUtils.openOverlaySettings(activity)
+                    1 -> RomPermissionUtils.openAutoStartSettings(activity)
+                    2 -> QueenBatteryHelper.openBatteryExemptionSettings(activity)
+                    3 -> {
+                        if (!RomPermissionUtils.openRomExtraPermissionHub(activity)) {
+                            RomPermissionUtils.openAutoStartSettings(activity)
+                        }
+                    }
+                    4 -> RomPermissionUtils.openAppDetails(activity)
+                    else -> RomPermissionUtils.openAppDetails(activity)
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun primaryActionLabel(activity: AppCompatActivity): Int = when {
+        !FloatingWindowPermissionHelper.hasPermission(activity) ->
+            R.string.domestic_rom_guide_go
+        isDomesticRom() &&
+            !QueenBatteryHelper.isExemptFromBatteryOptimizations(activity) ->
+            R.string.domestic_rom_guide_go_battery
+        else -> R.string.domestic_rom_guide_go_rom
+    }
+
+    private fun buildFullMessage(activity: AppCompatActivity, baseMessageRes: Int): String {
+        val base = activity.hon(baseMessageRes)
+        val statusLines = buildStatusLines(activity)
+        if (statusLines.isEmpty()) return base
+        return buildString {
+            append(base)
+            append("\n\n")
+            append(activity.getString(R.string.domestic_rom_guide_status_header))
+            append('\n')
+            statusLines.forEach { append("• ").append(it).append('\n') }
+        }.trimEnd()
+    }
+
+    private fun buildStatusLines(context: Context): List<String> {
+        val lines = mutableListOf<String>()
+        if (!FloatingWindowPermissionHelper.hasPermission(context)) {
+            lines.add(context.getString(R.string.domestic_rom_status_overlay))
+        }
+        if (isDomesticRom()) {
+            if (!QueenBatteryHelper.isExemptFromBatteryOptimizations(context)) {
+                lines.add(context.getString(R.string.domestic_rom_status_battery))
+            }
+            if (!RomPermissionProbe.isWriteSettingsAutoDetected(context)) {
+                lines.add(context.getString(R.string.domestic_rom_status_write_settings))
+            }
+            lines.add(context.getString(R.string.domestic_rom_status_autostart_hint))
+        }
+        return lines
     }
 
     private fun clearPending(context: Context) {

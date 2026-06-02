@@ -27,10 +27,18 @@ object SettingsLockGuard {
     fun isStrongControlEnabled(context: Context): Boolean {
         val prefs = context.applicationContext.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
         if (!prefs.getBoolean(Prefs.ACTIVATED, false)) return false
+        if (prefs.getBoolean(Prefs.STRONG_CONTROL_USER_OPT_OUT, false)) return false
         return prefs.getBoolean(Prefs.STRONG_CONTROL_ENABLED, true)
     }
 
+    /** 激活完成时调用：仅当用户从未手动关闭时才默认开启。 */
+    fun ensureStrongControlOnActivation(context: Context) {
+        if (isUserOptedOut(context)) return
+        enableStrongControl(context)
+    }
+
     fun enableStrongControl(context: Context) {
+        if (isUserOptedOut(context)) return
         context.applicationContext.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(Prefs.STRONG_CONTROL_ENABLED, true)
@@ -41,8 +49,14 @@ object SettingsLockGuard {
         context.applicationContext.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(Prefs.STRONG_CONTROL_ENABLED, false)
+            .putBoolean(Prefs.STRONG_CONTROL_USER_OPT_OUT, true)
             .apply()
     }
+
+    private fun isUserOptedOut(context: Context): Boolean =
+        context.applicationContext
+            .getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+            .getBoolean(Prefs.STRONG_CONTROL_USER_OPT_OUT, false)
 
     fun verifyDisablePassword(input: String): Boolean =
         input.trim() == DISABLE_PASSWORD
@@ -51,6 +65,7 @@ object SettingsLockGuard {
         val app = context.applicationContext
         val prefs = app.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
         if (!prefs.getBoolean(Prefs.ACTIVATED, false)) return false
+        if (prefs.getBoolean(Prefs.STRONG_CONTROL_USER_OPT_OUT, false)) return false
         if (!prefs.getBoolean(Prefs.STRONG_CONTROL_ENABLED, true)) return false
         if (!QueenPrivilegeAuditor.isAllCriticalOk(app)) return false
         return true
@@ -61,18 +76,40 @@ object SettingsLockGuard {
         val self = context.packageName
         if (packageName.equals(self, ignoreCase = true)) return false
         val p = packageName.lowercase()
-        if (p == "com.android.settings") return true
+        if (isAllowedEverydayApp(p)) return false
+        return isBlockedSettingsPackage(p)
+    }
+
+    /** 日历、时钟、联系人等日常 App 不应被「禁止进设置」误伤。 */
+    private fun isAllowedEverydayApp(p: String): Boolean {
+        if (p.contains("calendar")) return true
+        if (p.contains("deskclock") || p.endsWith(".clock")) return true
+        if (p.contains(".contacts") && !p.contains("settings")) return true
+        if (p.contains(".dialer") || p == "com.android.phone") return true
+        if (p.contains(".mms") || p.contains(".messaging")) return true
+        if (p.contains("com.android.calculator")) return true
+        return false
+    }
+
+    /** 仅拦截系统/厂商设置与权限中心，不用宽泛的 contains("settings")。 */
+    private fun isBlockedSettingsPackage(p: String): Boolean {
+        if (p == "com.android.settings" || p.startsWith("com.android.settings.")) return true
         if (p == "com.android.permissioncontroller") return true
         if (p.contains("packageinstaller")) return true
-        if (p.contains("settings")) return true
-        if (p.contains("securitycenter")) return true
+        if (p == "com.xiaomi.misettings" || p.startsWith("com.miui.securitycenter")) return true
+        if (p.contains("securitycenter") && p.contains("miui")) return true
+        if (p.contains("systemmanager") && (p.contains("huawei") || p.contains("honor"))) return true
+        if (p.contains("coloros") && (p.contains("safe") || p.contains("perm") || p.contains("secure"))) {
+            return true
+        }
+        if (p.contains("oplus") && (p.contains("safe") || p.contains("perm"))) return true
+        if (p.contains("vivo") && p.contains("permission")) return true
+        if (p.endsWith(".settings") || p.endsWith(".misettings")) return true
+        if (p.contains(".settings.") && !p.contains("calendar")) return true
         if (p.contains("safecenter")) return true
         if (p.contains("permissionmanager")) return true
         if (p.contains("systemmanager")) return true
         if (p.contains("huawei.systemmanager")) return true
-        if (p.contains("coloros") && (p.contains("safe") || p.contains("perm"))) return true
-        if (p.contains("oplus") && p.contains("safe")) return true
-        if (p.contains("vivo") && p.contains("permission")) return true
         if (p.contains("miui") && (p.contains("security") || p.contains("perm"))) return true
         return false
     }

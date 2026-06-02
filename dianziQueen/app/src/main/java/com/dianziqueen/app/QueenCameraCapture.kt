@@ -30,12 +30,9 @@ object QueenCameraCapture {
         return file to uri
     }
 
-    /** 是否有可响应拍摄的相机（manifest queries + 硬件特性双保险）。 */
-    fun isCaptureAvailable(context: Context): Boolean {
-        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        if (intent.resolveActivity(context.packageManager) != null) return true
-        return context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
-    }
+    /** 是否有可响应 [ACTION_IMAGE_CAPTURE] 的相机 App（不写入 FileProvider，仅用于 UI 提示）。 */
+    fun isCaptureAvailable(context: Context): Boolean =
+        queryCaptureActivities(context, Intent(MediaStore.ACTION_IMAGE_CAPTURE)).isNotEmpty()
 
     fun buildCaptureIntent(context: Context, outputUri: Uri): Intent =
         Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
@@ -50,12 +47,38 @@ object QueenCameraCapture {
 
     /**
      * 构建可 launch 的拍摄 Intent，并向各相机 App 显式授予 FileProvider Uri（OEM 兼容）。
+     * 仅返回 [resolveActivity] 非空的 Intent，并依次尝试：完整输出 / 无 clipData / 显式组件 / 缩略图回退。
      */
     fun launchableCaptureIntent(context: Context, outputUri: Uri): Intent? {
-        if (!isCaptureAvailable(context)) return null
-        val intent = buildCaptureIntent(context, outputUri)
-        grantUriToCaptureApps(context, outputUri, intent)
-        return intent
+        val pm = context.packageManager
+        val handlers = queryCaptureActivities(context, Intent(MediaStore.ACTION_IMAGE_CAPTURE))
+        if (handlers.isEmpty()) return null
+
+        val candidates = listOf(
+            buildCaptureIntent(context, outputUri),
+            Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+                putExtra(MediaStore.EXTRA_OUTPUT, outputUri)
+                addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            },
+            Intent(MediaStore.ACTION_IMAGE_CAPTURE),
+        )
+
+        for (base in candidates) {
+            if (base.hasExtra(MediaStore.EXTRA_OUTPUT)) {
+                grantUriToCaptureApps(context, outputUri, base)
+            }
+            resolveForLaunch(pm, base)?.let { return base }
+
+            for (info in handlers) {
+                val ai = info.activityInfo
+                val explicit = Intent(base).setClassName(ai.packageName, ai.name)
+                if (base.hasExtra(MediaStore.EXTRA_OUTPUT)) {
+                    grantUriPermission(context, ai.packageName, outputUri)
+                }
+                resolveForLaunch(pm, explicit)?.let { return explicit }
+            }
+        }
+        return null
     }
 
     /**
@@ -139,6 +162,22 @@ object QueenCameraCapture {
         }
     }
 
+    private fun resolveForLaunch(
+        pm: PackageManager,
+        intent: Intent,
+    ): android.content.ComponentName? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val info = pm.resolveActivity(
+                intent,
+                PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()),
+            ) ?: return null
+            val ai = info.activityInfo
+            return android.content.ComponentName(ai.packageName, ai.name)
+        }
+        @Suppress("DEPRECATION")
+        return intent.resolveActivity(pm)
+    }
+
     private fun readFileBytes(file: File): ByteArray? =
         try {
             file.readBytes().takeIf { it.isNotEmpty() }
@@ -157,16 +196,19 @@ object QueenCameraCapture {
             null
         }
 
-    private fun grantUriToCaptureApps(context: Context, outputUri: Uri, intent: Intent) {
+    private fun grantUriPermission(context: Context, packageName: String, outputUri: Uri) {
         val flags = Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION
         try {
+            context.grantUriPermission(packageName, outputUri, flags)
+        } catch (e: Exception) {
+            Log.w(TAG, "grantUri to $packageName failed: ${e.message}")
+        }
+    }
+
+    private fun grantUriToCaptureApps(context: Context, outputUri: Uri, intent: Intent) {
+        try {
             for (info in queryCaptureActivities(context, intent)) {
-                val pkg = info.activityInfo.packageName
-                try {
-                    context.grantUriPermission(pkg, outputUri, flags)
-                } catch (e: Exception) {
-                    Log.w(TAG, "grantUri to $pkg failed: ${e.message}")
-                }
+                grantUriPermission(context, info.activityInfo.packageName, outputUri)
             }
         } catch (e: Exception) {
             Log.w(TAG, "grantUriToCaptureApps failed: ${e.message}")

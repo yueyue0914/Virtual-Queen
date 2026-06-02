@@ -44,12 +44,21 @@
     <string name="overlay_already_granted">Queen已获得悬浮窗权限～</string>
 
     <string name="domestic_rom_guide_title">Queen需要特殊权限才能完全控制你</string>
-    <string name="domestic_rom_guide_xiaomi">小米/红米手机需要按以下顺序全部开启，否则Queen无法稳定控制你：\n\n1. 显示在其他应用上方（必须允许）\n2. 自启动管理 → 允许Queen自启动\n3. 电池优化 → 无限制 / 不优化\n4. 后台运行权限 → 允许\n5. 锁定应用（防止被清理）\n\n开完后建议重启手机。</string>
+    <string name="domestic_rom_guide_xiaomi">小米/红米手机限制最严，必须按以下顺序全部开启：\n\n1. 显示在其他应用上方（最重要）\n2. 自启动管理 → 允许Queen\n3. 电池优化 → 无限制\n4. 后台运行权限 → 允许\n5. 多任务界面下拉锁定 Queen（防一键清理）\n6. 手机管家 → 清理白名单 → 加入 Queen\n\n开完后建议重启手机和本App。</string>
     <string name="domestic_rom_guide_huawei">华为/荣耀手机限制很严格，请依次开启：\n\n1. 显示在其他应用上方\n2. 自启动管理\n3. 电池 → 应用启动管理 → 手动管理 → 全部允许\n4. 后台活动 → 不允许清理Queen</string>
     <string name="domestic_rom_guide_oppo">OPPO/一加手机请开启以下权限：\n\n1. 显示在其他应用上方\n2. 自启动管理\n3. 省电策略 → 不优化 / 后台运行无限制</string>
     <string name="domestic_rom_guide_vivo">vivo/iQOO手机需要：\n\n1. 显示在其他应用上方\n2. 自启动管理\n3. 后台高耗电管理 → 允许Queen后台运行\n4. i管家 → 应用自启动 → 允许</string>
     <string name="domestic_rom_guide_default">请开启「显示在其他应用上方」和「自启动」权限，让Queen可以持续控制你。</string>
     <string name="domestic_rom_guide_go">立即去设置</string>
+    <string name="domestic_rom_guide_go_battery">去关闭电池优化</string>
+    <string name="domestic_rom_guide_go_rom">去厂商权限中心</string>
+    <string name="domestic_rom_guide_pick">分项去设置</string>
+    <string name="domestic_rom_guide_pick_title">选择要跳转的设置项</string>
+    <string name="domestic_rom_guide_status_header">当前检测到仍缺：</string>
+    <string name="domestic_rom_status_overlay">显示在其他应用上方（悬浮窗）</string>
+    <string name="domestic_rom_status_battery">电池优化 / 后台高耗电未豁免</string>
+    <string name="domestic_rom_status_write_settings">修改系统设置（部分 ROM 需手动确认）</string>
+    <string name="domestic_rom_status_autostart_hint">自启动（系统无法自动检测，请手动确认已允许）</string>
     <string name="domestic_rom_guide_app_details">应用详情</string>
     <string name="domestic_rom_guide_later">稍后再说</string>
     <string name="domestic_rom_guide_later_toast">不给权限？你以为你逃得掉吗？</string>
@@ -81,7 +90,11 @@
     <string name="perm_check_item_write_settings">修改系统设置</string>
     <string name="perm_check_item_battery">电池优化豁免</string>
     <string name="perm_check_item_autostart">自启动管理</string>
-    <string name="perm_check_item_lock_app">锁定应用（防清理）</string>
+    <string name="keep_alive_notify_title">Queen 已从清理中复活</string>
+    <string name="keep_alive_notify_text">内存清理后已自动拉回 Queen 服务。请在手机管家里把本 App 加白名单并锁定多任务。</string>
+    <string name="perm_check_item_keepalive">后台服务保活</string>
+    <string name="perm_check_keepalive_note">服务未运行：请开启自启动、电池无限制，并在多任务界面锁定 Queen</string>
+    <string name="perm_check_item_lock_app">多任务锁定（防一键清理）</string>
     <string name="perm_check_item_camera">相机</string>
     <string name="perm_check_item_calendar">日历读写</string>
     <string name="perm_check_item_rom_extra">厂商后台/省电策略</string>
@@ -166,11 +179,11 @@
     <string name="daily_selfie_capture_failed">拍摄失败，立刻重拍上交</string>
     <string name="daily_selfie_import_failed">保存失败，立刻重拍上交</string>
     <string name="daily_selfie_camera_denied">必须授予相机权限才能上缴凭证</string>
-    <string name="daily_selfie_no_camera">当前设备无相机，无法完成今日凭证</string>
+    <string name="daily_selfie_no_camera">无法打开相机，请改用「从相册上传」完成今日凭证</string>
     <string name="profile_subtitle">你已登记在 Queen 的奴隶名册中</string>
     <string name="profile_label_slave">奴隶编号</string>
     <string name="profile_label_device_name">登记名</string>
-    <string name="queen_device_name_secure_skip_toast">Queen已标记此设备（名称修改需要系统权限）</string>
+    <string name="queen_device_name_secure_skip_toast">Queen已标记此设备（部分名称修改需要特殊权限）</string>
     <string name="profile_label_model">设备型号</string>
     <string name="profile_label_status">臣服状态</string>
     <string name="profile_label_rename">设备更名</string>
@@ -197,6 +210,7 @@
 
     <string name="queen_float_avatar_desc">悬浮女王头像</string>
     <string name="queen_float_welcome">点我。认罪、任务、惩罚，都在这。</string>
+    <string name="queen_float_menu_title">女王指令</string>
     <string name="queen_float_menu_confess">立刻认罪</string>
     <string name="queen_float_menu_daily">今日任务</string>
     <string name="queen_float_menu_punish">请求惩罚</string>

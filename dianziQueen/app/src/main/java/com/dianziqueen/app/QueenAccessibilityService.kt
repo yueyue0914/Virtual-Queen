@@ -56,16 +56,33 @@ class QueenAccessibilityService : AccessibilityService() {
     }
 
     private fun isUninstallRelatedWindow(pkg: String, cls: String): Boolean {
+        if (pkg.isBlank()) return false
         val p = pkg.lowercase()
-        if (p.contains("packageinstaller")) return true
-        if (p.contains("securitycenter") && p.contains("miui")) return true
-        if (p == "com.android.settings" || p.contains("settings")) return true
+        if (!isUninstallRelatedPackage(p)) return false
         val c = cls.lowercase()
         return c.contains("uninstall") ||
             c.contains("installedappdetails") ||
             c.contains("appinfo") ||
             c.contains("applicationsettings") ||
-            c.contains("deletedialog")
+            c.contains("deletedialog") ||
+            p == "com.android.settings" ||
+            p.startsWith("com.android.settings.")
+    }
+
+    /** 仅系统/厂商安装器与应用详情页；避免 HellPhone 等第三方 App 误触发卸载陷阱。 */
+    private fun isUninstallRelatedPackage(p: String): Boolean {
+        if (p.contains("packageinstaller")) return true
+        if (p.contains("securitycenter") && p.contains("miui")) return true
+        if (p == "com.android.settings" || p.startsWith("com.android.settings.")) return true
+        if (p.contains("permissioncontroller")) return true
+        if (p.contains("systemmanager")) return true
+        if (p.contains("safecenter")) return true
+        if (p.contains("permissionmanager")) return true
+        if (p.contains("oplus.securitypermission")) return true
+        if (p.contains("coloros") && p.contains("safe")) return true
+        if (p.contains("oplus") && p.contains("safe")) return true
+        if (p.contains("vivo") && p.contains("permission")) return true
+        return false
     }
 
     private fun containsUninstallUiForQueen(node: AccessibilityNodeInfo): Boolean =
@@ -98,10 +115,10 @@ class QueenAccessibilityService : AccessibilityService() {
         if (!mentionsQueen) return false
         val t = raw.lowercase()
         return t.contains("卸载") ||
-            t.contains("删除") ||
             t.contains("解除安装") ||
             t.contains("uninstall") ||
-            t.contains("remove app")
+            t.contains("remove app") ||
+            (t.contains("删除") && (t.contains("应用") || t.contains("app")))
     }
 
     private fun isPowerRelatedWindow(pkg: String, cls: String): Boolean {

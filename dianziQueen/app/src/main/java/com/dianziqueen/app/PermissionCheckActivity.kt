@@ -111,6 +111,26 @@ class PermissionCheckActivity : AppCompatActivity() {
                 note = romProbeNote(context, "battery"),
                 fixAction = PermissionStatus.FixAction.BATTERY,
             ),
+        )
+
+        if (activated) {
+            list.add(
+                PermissionStatus(
+                    id = "keepalive",
+                    name = getString(R.string.perm_check_item_keepalive),
+                    isGranted = QueenKeepAlive.isServiceHealthy(context),
+                    critical = true,
+                    note = if (!QueenKeepAlive.isServiceHealthy(context)) {
+                        getString(R.string.perm_check_keepalive_note)
+                    } else {
+                        ""
+                    },
+                    fixAction = PermissionStatus.FixAction.ROM_GUIDE,
+                ),
+            )
+        }
+
+        list.add(
             PermissionStatus(
                 id = "autostart",
                 name = getString(R.string.perm_check_item_autostart),
@@ -121,7 +141,7 @@ class PermissionCheckActivity : AppCompatActivity() {
             ),
         )
 
-        if (RomPermissionUtils.isXiaomi()) {
+        if (RomPermissionUtils.isDomesticRom()) {
             list.add(
                 PermissionStatus(
                     id = "lock_app",

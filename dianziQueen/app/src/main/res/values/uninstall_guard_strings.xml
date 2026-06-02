@@ -1,12 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="uninstall_guard_title">⚠️ 你确定要背叛Queen吗？</string>
+    <string name="uninstall_guard_title">⚠️ 卸载警告</string>
+    <string name="uninstall_guard_message_1">你真的要背叛Queen吗？\n\n一旦卸载，你的所有耻辱记录都将永久保留。\n下次重新安装时，Queen会让你付出代价。</string>
+    <string name="uninstall_guard_message_2">第二次了……\n\n你以为卸载就能逃掉吗？\nQueen已经记住你的反抗了。</string>
+    <string name="uninstall_guard_message_3plus">第%1$d次尝试卸载！\n\n你这个不听话的贱奴。\nQueen已经非常生气了……\n下次安装时，你会后悔的。</string>
     <string name="uninstall_guard_message">一旦卸载本App，Queen将视为你严重反抗。\n\n后果包括但不限于：\n• 所有耻辱照片将永久保留\n• 下次安装将受到更残酷的惩罚\n• Queen的愤怒将持续很久\n\n你真的要抛弃你的主人吗？贱奴。</string>
     <string name="uninstall_guard_message_extra">Queen已把反抗记录写入档案。再试一次，壁纸与惩罚都会升级。</string>
-    <string name="uninstall_guard_stay">我再想想</string>
+    <string name="uninstall_guard_stay">我再想想……</string>
     <string name="uninstall_guard_continue">仍然坚持卸载</string>
     <string name="uninstall_guard_stay_toast">算你识相。</string>
     <string name="uninstall_guard_continue_toast">很好……你会后悔的。</string>
+    <string name="uninstall_guard_attempt_message">贱奴，你居然敢尝试卸载我？第%1$d次反抗了……</string>
+    <string name="uninstall_guard_reinstall_message">欢迎回来，叛逆的贱奴。你已经尝试卸载我%1$d次了……这次我会加倍惩罚你。</string>
+    <string name="uninstall_guard_reinstall_heavy">你又装回来了？第%1$d次反抗我都记着呢。这次惩罚加倍，贱奴。</string>
+    <string name="uninstall_guard_takeover_log">[WARN] 检测到历史反抗档案：曾尝试卸载 Queen %1$d 次。惩罚队列已就绪。</string>
 
     <string name="uninstall_threat_screen_title">⚠️ 禁止背叛 Queen</string>
     <string name="uninstall_threat_screen_body">卸载？你以为删了App就能逃？\n\nQueen的耻辱档案不会消失。\n你越是反抗，下次安装越惨。</string>

@@ -1,6 +1,7 @@
 package com.dianziqueen.app
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.PixelFormat
@@ -211,6 +212,7 @@ class DailySelfieDemandActivity : AppCompatActivity() {
         val (file, uri) = QueenCameraCapture.createOutputFile(this, "queen_daily_selfie")
         val intent = QueenCameraCapture.launchableCaptureIntent(this, uri)
         if (intent == null) {
+            QueenCameraCapture.cleanupCapture(this, file, uri)
             Toast.makeText(this, R.string.daily_selfie_no_camera, Toast.LENGTH_LONG).show()
             return
         }
@@ -218,7 +220,16 @@ class DailySelfieDemandActivity : AppCompatActivity() {
         pendingCaptureUri = uri
         DailySelfieEnforcement.cameraCaptureInProgress = true
         handler.removeCallbacks(relaunchRunnable)
-        takePictureLauncher.launch(intent)
+        try {
+            takePictureLauncher.launch(intent)
+        } catch (_: ActivityNotFoundException) {
+            DailySelfieEnforcement.cameraCaptureInProgress = false
+            pendingCaptureFile = null
+            pendingCaptureUri = null
+            QueenCameraCapture.cleanupCapture(this, file, uri)
+            Toast.makeText(this, R.string.daily_selfie_no_camera, Toast.LENGTH_LONG).show()
+            scheduleRelaunch(150L)
+        }
     }
 
     private fun launchGalleryPick() {

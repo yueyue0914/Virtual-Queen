@@ -44,7 +44,14 @@ class DianziQueenApp : Application() {
 
             override fun onActivityStarted(activity: Activity) = Unit
             override fun onActivityPaused(activity: Activity) = Unit
-            override fun onActivityStopped(activity: Activity) = Unit
+            override fun onActivityStopped(activity: Activity) {
+                if (activity.applicationContext
+                        .getSharedPreferences(Prefs.NAME, MODE_PRIVATE)
+                        .getBoolean(Prefs.ACTIVATED, false)
+                ) {
+                    QueenKeepAlive.ensureRunning(activity.applicationContext, notifyIfRestored = false)
+                }
+            }
             override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
             override fun onActivityDestroyed(activity: Activity) = Unit
         })

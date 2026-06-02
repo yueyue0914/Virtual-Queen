@@ -39,6 +39,7 @@
     <queries>
         <intent>
             <action android:name="android.media.action.IMAGE_CAPTURE" />
+            <category android:name="android.intent.category.DEFAULT" />
         </intent>
     </queries>
 
@@ -169,6 +170,10 @@
 
         <receiver
             android:name=".DailySelfieAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".KeepAliveReceiver"
             android:exported="false" />
 
         <provider

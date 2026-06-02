@@ -15,6 +15,7 @@ class BootReceiver : BroadcastReceiver() {
         DailySelfieScheduler.ensureTodaySchedule(app)
         val i = Intent(app, QueenService::class.java)
         app.startForegroundService(i)
+        QueenKeepAlive.scheduleWatchdog(app)
     }
 }
 
@@ -62,5 +63,9 @@ object Prefs {
     const val BOOT_PUNISH_FOR_ATTEMPT_AT = "boot_punish_for_attempt_at"
     /** 最强控制：拦截系统设置（默认开启，可在 App 设置页用密码关闭）。 */
     const val STRONG_CONTROL_ENABLED = "strong_control_enabled"
+    /** 用户曾用密码手动关闭最强控制；激活流程不得再自动打开。 */
+    const val STRONG_CONTROL_USER_OPT_OUT = "strong_control_user_opt_out"
+    /** [QueenService] 最近一次心跳（毫秒）。 */
+    const val QUEEN_SERVICE_HEARTBEAT_AT = "queen_service_heartbeat_at"
     const val QUEEN_HONORIFIC_PRESET = "queen_honorific_preset"
 }

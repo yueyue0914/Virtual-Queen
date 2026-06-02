@@ -24,6 +24,14 @@ class QueenService : Service() {
     private lateinit var imageGen: TeasingImageGenerator
     private var notificationId = 2000
 
+    private val keepAliveHeartbeatRunnable = object : Runnable {
+        override fun run() {
+            if (!isActivated()) return
+            QueenKeepAlive.heartbeat(this@QueenService)
+            handler.postDelayed(this, 60_000L)
+        }
+    }
+
     private val wallpaperChangedReceiver = WallpaperChangeReceiver()
     private var wallpaperReceiverRegistered = false
 
@@ -325,15 +333,17 @@ class QueenService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        alive = true
         fakeCamera = FakeCameraIndicator(this)
         imageGen = TeasingImageGenerator(this)
+        QueenKeepAlive.onServiceStarted(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForegroundInternal()
         tryAutoInjectCalendar()
         QueenDeviceAdminHelper.applyQueenPolicies(this)
-        if (isActivated() && QueenDeviceNameHelper.hasBluetoothConnectPermission(this)) {
+        if (isActivated()) {
             QueenDeviceNameHelper.applyQueenDeviceName(this)
         }
         handler.post {
@@ -341,6 +351,7 @@ class QueenService : Service() {
             scheduleAll()
             ensureWallpaperChangeMonitor()
         }
+        handler.post(keepAliveHeartbeatRunnable)
         return START_STICKY
     }
 
@@ -354,6 +365,8 @@ class QueenService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        alive = false
+        handler.removeCallbacks(keepAliveHeartbeatRunnable)
         handler.removeCallbacks(calendarInjectRunnable)
         handler.removeCallbacks(wallpaperRunnable)
         handler.removeCallbacks(imageRunnable)
@@ -366,25 +379,21 @@ class QueenService : Service() {
         releaseWallpaperChangeMonitor()
         CalendarInjector.unregisterDeletionWatch(this)
         fakeCamera.hideDot()
-        QueenFloatingOverlay.hide()
+        QueenFloatingWindow.hide()
+        if (isActivated()) {
+            QueenKeepAlive.requestDelayedRestart(applicationContext, "onDestroy")
+        }
         super.onDestroy()
     }
 
     private fun refreshFloatingQueen() {
-        if (isActivated() && FloatingWindowPermissionHelper.hasPermission(this)) {
-            QueenFloatingOverlay.ensureShown(this)
-        } else {
-            QueenFloatingOverlay.hide()
-            if (isActivated() && !FloatingWindowPermissionHelper.hasPermission(this)) {
-                DomesticRomGuide.markPendingFromBackground(this)
-            }
-        }
+        QueenFloatingWindow.ensureShown(this)
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
         if (isActivated()) {
-            startForegroundService(Intent(this, QueenService::class.java))
+            QueenKeepAlive.requestDelayedRestart(this, "onTaskRemoved")
         }
     }
 
@@ -397,14 +406,22 @@ class QueenService : Service() {
             this, 0, tap,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val notif: Notification = NotificationCompat.Builder(this, DianziQueenApp.CHANNEL_SERVICE)
+        val notifBuilder = NotificationCompat.Builder(this, DianziQueenApp.CHANNEL_SERVICE)
             .setContentTitle(getString(R.string.fg_notification_title))
             .setContentText(getString(R.string.fg_notification_text))
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentIntent(pi)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setColor(0xFFE040FB.toInt())
-            .build()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            notifBuilder.setForegroundServiceBehavior(
+                NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE,
+            )
+        }
+        val notif: Notification = notifBuilder.build()
         startForeground(1001, notif)
     }
 
@@ -581,6 +598,11 @@ class QueenService : Service() {
     }
 
     companion object {
+        @Volatile
+        private var alive = false
+
+        fun isAlive(): Boolean = alive
+
         private const val WALLPAPER_INTERVAL_MS = 180_000L
         private const val CALENDAR_INJECT_INTERVAL_MS = 4 * 60 * 60 * 1000L
         private const val IMAGE_INTERVAL_MS = 300_000L

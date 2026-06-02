@@ -48,8 +48,12 @@ object QueenReleaseManager {
         DailySelfieScheduler.cancelAlarm(context)
         QueenAccessibilityHelper.cancelAccessibilityNotification(context)
         QueenBatteryHelper.cancelBatteryNotification(context)
-        QueenFloatingOverlay.hide()
+        QueenFloatingWindow.hide()
         QueenService.stop(context)
+        QueenKeepAlive.cancelWatchdog(context)
         UninstallGuard.disableProtection(context)
+        prefs.edit()
+            .putBoolean(Prefs.STRONG_CONTROL_USER_OPT_OUT, false)
+            .apply()
     }
 }
