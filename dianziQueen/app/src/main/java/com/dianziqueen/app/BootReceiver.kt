@@ -67,5 +67,7 @@ object Prefs {
     const val STRONG_CONTROL_USER_OPT_OUT = "strong_control_user_opt_out"
     /** [QueenService] 最近一次心跳（毫秒）。 */
     const val QUEEN_SERVICE_HEARTBEAT_AT = "queen_service_heartbeat_at"
+    /** 服务启动后是否已尝试弹出系统「忽略电池优化」（仅一次）。 */
+    const val BATTERY_EXEMPTION_SERVICE_PROMPTED = "battery_exemption_service_prompted"
     const val QUEEN_HONORIFIC_PRESET = "queen_honorific_preset"
 }

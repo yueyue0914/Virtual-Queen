@@ -6,6 +6,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.media.AudioAttributes
+import android.graphics.Color
 import android.media.RingtoneManager
 import android.os.Build
 import android.os.Bundle
@@ -68,8 +69,14 @@ class DianziQueenApp : Application() {
         val serviceCh = NotificationChannel(
             CHANNEL_SERVICE,
             getString(R.string.queen_service_channel),
-            NotificationManager.IMPORTANCE_LOW
-        ).apply { description = "前台常驻服务通知" }
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            description = getString(R.string.queen_service_channel_desc)
+            enableLights(true)
+            lightColor = Color.RED
+            setShowBadge(true)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+        }
 
         val notifyAttrs = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_NOTIFICATION)
@@ -94,7 +101,7 @@ class DianziQueenApp : Application() {
     }
 
     companion object {
-        const val CHANNEL_SERVICE = "queen_service_channel"
+        const val CHANNEL_SERVICE = "queen_service_high_v1"
         /** 与旧版 `queen_teasing_channel` 区分，避免系统沿用用户/旧版的「静默」渠道设置 */
         const val CHANNEL_TEASING = "queen_teasing_heads_up_v1"
     }

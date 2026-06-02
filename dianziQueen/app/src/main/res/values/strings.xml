@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">电子Queen</string>
-    <string name="queen_service_channel">Queen 常驻服务</string>
+    <string name="queen_service_channel">Queen 控制服务</string>
+    <string name="queen_service_channel_desc">Queen 正在监控并控制此设备（常驻，不可清除）</string>
     <string name="queen_teasing_channel">Queen 提示</string>
-    <string name="fg_notification_title">DIANZI QUEEN // ACTIVE</string>
-    <string name="fg_notification_text">电子Queen 正在运行（用户已激活）。</string>
+    <string name="fg_notification_title">Queen 正在看着你</string>
+    <string name="fg_notification_text">贱奴，你的一举一动都在我的监控之下</string>
 
     <string name="lock_title">电子QUEEN</string>
     <string name="lock_subtitle">By 月月</string>

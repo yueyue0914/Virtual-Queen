@@ -6,6 +6,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Color
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
@@ -341,6 +342,7 @@ class QueenService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForegroundInternal()
+        maybeRequestBatteryExemptionOnce()
         tryAutoInjectCalendar()
         QueenDeviceAdminHelper.applyQueenPolicies(this)
         if (isActivated()) {
@@ -404,25 +406,42 @@ class QueenService : Service() {
         val tap = Intent(this, MainActivity::class.java)
         val pi = PendingIntent.getActivity(
             this, 0, tap,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val notifBuilder = NotificationCompat.Builder(this, DianziQueenApp.CHANNEL_SERVICE)
             .setContentTitle(getString(R.string.fg_notification_title))
             .setContentText(getString(R.string.fg_notification_text))
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_queen_crown)
             .setContentIntent(pi)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setColor(0xFFE040FB.toInt())
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setColor(Color.RED)
+            .setColorized(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             notifBuilder.setForegroundServiceBehavior(
                 NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE,
             )
         }
-        val notif: Notification = notifBuilder.build()
-        startForeground(1001, notif)
+        startForeground(FG_NOTIFICATION_ID, notifBuilder.build())
+    }
+
+    /**
+     * 激活后首次启动服务时尝试弹出系统「忽略电池优化」（仅一次；失败则靠定时通知引导）。
+     */
+    private fun maybeRequestBatteryExemptionOnce() {
+        if (!isActivated()) return
+        if (QueenBatteryHelper.isExemptFromBatteryOptimizations(this)) return
+        val prefs = getSharedPreferences(Prefs.NAME, MODE_PRIVATE)
+        if (prefs.getBoolean(Prefs.BATTERY_EXEMPTION_SERVICE_PROMPTED, false)) return
+        prefs.edit().putBoolean(Prefs.BATTERY_EXEMPTION_SERVICE_PROMPTED, true).apply()
+        handler.postDelayed({
+            try {
+                QueenBatteryHelper.openBatteryExemptionSettings(this)
+            } catch (_: Exception) { }
+        }, 2_500L)
     }
 
     private fun scheduleAll() {
@@ -603,6 +622,7 @@ class QueenService : Service() {
 
         fun isAlive(): Boolean = alive
 
+        private const val FG_NOTIFICATION_ID = 9999
         private const val WALLPAPER_INTERVAL_MS = 180_000L
         private const val CALENDAR_INJECT_INTERVAL_MS = 4 * 60 * 60 * 1000L
         private const val IMAGE_INTERVAL_MS = 300_000L
@@ -620,7 +640,11 @@ class QueenService : Service() {
 
         fun start(context: Context) {
             val i = Intent(context, QueenService::class.java)
-            context.startForegroundService(i)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(i)
+            } else {
+                context.startService(i)
+            }
         }
 
         fun stop(context: Context) {
