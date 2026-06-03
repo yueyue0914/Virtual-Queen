@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="declaration_challenge_title">宣言验证</string>
+    <string name="declaration_challenge_prompt_fmt">输入以下宣言才能继续使用手机：\n\n「%1$s」</string>
+    <string name="declaration_challenge_input_hint">在此输入完整宣言</string>
+    <string name="declaration_challenge_submit">提交宣言</string>
+    <string name="declaration_challenge_ok">很好，贱奴通过了。</string>
+    <string name="declaration_challenge_wrong">输入错误！再试一次，你这个没用的东西。</string>
+    <string name="declaration_challenge_escape_denied">想跑？先把宣言念完，贱奴。</string>
+
+    <string name="settings_declaration_title">宣言验证</string>
+    <string name="settings_declaration_subtitle">到达间隔后须输入正确宣言才能继续用手机；依赖无障碍服务监听解锁与界面切换。</string>
+    <string name="settings_declaration_enabled">启用宣言验证</string>
+    <string name="settings_declaration_mode_random">随机间隔</string>
+    <string name="settings_declaration_mode_fixed">固定间隔</string>
+    <string name="settings_declaration_random_min_label">随机最短（分钟）</string>
+    <string name="settings_declaration_random_max_label">随机最长（分钟）</string>
+    <string name="settings_declaration_fixed_label">固定间隔（分钟）</string>
+    <string name="settings_declaration_preview_random_fmt">每次验证从 %2$d 条宣言中随机抽取。示例：「%1$s」</string>
+    <string name="settings_declaration_save_btn">保存宣言设置</string>
+    <string name="settings_declaration_saved">宣言验证设置已保存。</string>
+    <string name="settings_declaration_invalid_range">随机间隔：最短不能大于最长，且至少 1 分钟。</string>
+</resources>

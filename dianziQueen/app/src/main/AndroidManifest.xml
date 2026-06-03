@@ -83,6 +83,17 @@
             android:turnScreenOn="true" />
 
         <activity
+            android:name=".DeclarationChallengeActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:screenOrientation="portrait"
+            android:showWhenLocked="true"
+            android:theme="@style/Theme.DianziQueen"
+            android:turnScreenOn="true"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".QueenSettingsActivity"
             android:exported="false"
             android:screenOrientation="portrait"
@@ -129,6 +140,7 @@
                 android:resource="@xml/queen_device_admin" />
             <intent-filter>
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+                <action android:name="android.app.action.DEVICE_ADMIN_DISABLE_REQUESTED" />
             </intent-filter>
         </receiver>
 

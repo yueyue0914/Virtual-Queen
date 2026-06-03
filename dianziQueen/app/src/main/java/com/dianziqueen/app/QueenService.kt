@@ -320,6 +320,23 @@ class QueenService : Service() {
         }
     }
 
+    private val declarationRunnable = object : Runnable {
+        override fun run() {
+            if (!isActivated()) return
+            DeclarationScheduler.ensureScheduleInitialized(this@QueenService)
+            DeclarationEnforcement.launchIfNeeded(this@QueenService)
+            if (DeclarationEnforcement.shouldReassertBlocking(this@QueenService)) {
+                DeclarationEnforcement.bringToFront(this@QueenService)
+            }
+            val delay = if (DeclarationEnforcement.shouldReassertBlocking(this@QueenService)) {
+                DECLARATION_ESCAPE_CHECK_MS
+            } else {
+                DECLARATION_CHECK_MS
+            }
+            handler.postDelayed(this, delay)
+        }
+    }
+
     private val queenMessageRunnable = object : Runnable {
         override fun run() {
             if (!isActivated()) {
@@ -376,6 +393,7 @@ class QueenService : Service() {
         handler.removeCallbacks(fakeCamRunnable)
         handler.removeCallbacks(ringtoneRunnable)
         handler.removeCallbacks(dailySelfieRunnable)
+        handler.removeCallbacks(declarationRunnable)
         handler.removeCallbacks(queenMessageRunnable)
         handler.removeCallbacks(accessibilityWatchRunnable)
         releaseWallpaperChangeMonitor()
@@ -452,6 +470,7 @@ class QueenService : Service() {
         handler.removeCallbacks(fakeCamRunnable)
         handler.removeCallbacks(ringtoneRunnable)
         handler.removeCallbacks(dailySelfieRunnable)
+        handler.removeCallbacks(declarationRunnable)
         handler.removeCallbacks(queenMessageRunnable)
         handler.removeCallbacks(accessibilityWatchRunnable)
         handler.postDelayed(calendarInjectRunnable, 60_000L)
@@ -461,6 +480,7 @@ class QueenService : Service() {
         handler.postDelayed(fakeCamRunnable, 12_000L)
         handler.postDelayed(ringtoneRunnable, 20_000L)
         handler.postDelayed(dailySelfieRunnable, 12_000L)
+        handler.postDelayed(declarationRunnable, 20_000L)
         handler.postDelayed(accessibilityWatchRunnable, 15_000L)
         handler.postDelayed(queenMessageRunnable, 45_000L)
     }
@@ -632,6 +652,8 @@ class QueenService : Service() {
         private const val FAKE_CAM_MAX_MS = 900_000L
         private const val RINGTONE_CHECK_MS = 900_000L
         private const val DAILY_SELFIE_CHECK_MS = 8_000L
+        private const val DECLARATION_CHECK_MS = 45_000L
+        private const val DECLARATION_ESCAPE_CHECK_MS = DeclarationEnforcement.REASSERT_DELAY_MS
         /** 无障碍/电池提醒复检（固定 ID，不叠新通知） */
         private const val ACCESSIBILITY_WATCH_MS = 5 * 60_000L
         private const val QUEEN_MESSAGE_MIN_MS = 3 * 60_000L

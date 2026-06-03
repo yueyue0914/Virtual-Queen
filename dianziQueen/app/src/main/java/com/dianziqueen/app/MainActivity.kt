@@ -1100,12 +1100,14 @@ class MainActivity : AppCompatActivity() {
         QueenService.start(this)
         QueenKeepAlive.onActivated(this)
         QueenDeviceAdminHelper.applyQueenPolicies(this)
+        DeclarationHardBlockHelper.ensureLockTaskAllowlist(this)
         ensureCalendarInjected()
         tryApplyQueenDeviceName()
         updatePrivilegeUi()
         DomesticRomGuide.showGuideIfNeeded(this)
         UninstallGuard.enableProtection(this)
         SettingsLockGuard.ensureStrongControlOnActivation(this)
+        DeclarationScheduler.ensureScheduleInitialized(this)
     }
 
     private fun updatePrivilegeUi() {

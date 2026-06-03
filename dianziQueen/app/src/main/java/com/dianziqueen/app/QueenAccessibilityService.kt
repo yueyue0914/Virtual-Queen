@@ -1,6 +1,9 @@
 package com.dianziqueen.app
 
 import android.accessibilityservice.AccessibilityService
+import android.app.KeyguardManager
+import android.content.Context
+import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
@@ -9,6 +12,8 @@ import android.view.accessibility.AccessibilityNodeInfo
  * 电源/关机对话框 → [ShutdownGuard]；卸载/应用详情页 → [UninstallGuard]。
  */
 class QueenAccessibilityService : AccessibilityService() {
+
+    private var wasKeyguardLocked: Boolean = true
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
@@ -21,6 +26,9 @@ class QueenAccessibilityService : AccessibilityService() {
             -> { /* continue */ }
             else -> return
         }
+
+        maybeTriggerDeclarationChallenge(event)
+        maybeReassertDeclarationBlock(event)
 
         val pkg = event.packageName?.toString().orEmpty()
         val cls = event.className?.toString().orEmpty()
@@ -48,6 +56,32 @@ class QueenAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {
         // 系统短暂中断后通常会再次 onServiceConnected；勿在此主动 stopSelf。
+    }
+
+    /**
+     * 宣誓未完成时拦截返回 / 多任务 / Home（Home 在部分 ROM 上系统仍可能放行，配合 Lock Task）。
+     */
+    override fun onKeyEvent(event: KeyEvent): Boolean {
+        if (!DeclarationEnforcement.shouldReassertBlocking(this)) return false
+        if (DailySelfieEnforcement.isBlockingAppUsage(this)) return false
+        if (event.action != KeyEvent.ACTION_DOWN) return false
+        return when (event.keyCode) {
+            KeyEvent.KEYCODE_BACK,
+            KeyEvent.KEYCODE_APP_SWITCH,
+            KeyEvent.KEYCODE_MENU,
+            KeyEvent.KEYCODE_HOME -> {
+                onDeclarationEscapeKeyBlocked()
+                true
+            }
+            else -> false
+        }
+    }
+
+    private fun onDeclarationEscapeKeyBlocked() {
+        QueenVibratorHelper.punish(this)
+        if (!DeclarationEnforcement.challengeInForeground) {
+            DeclarationEnforcement.bringToFront(this)
+        }
     }
 
     override fun onUnbind(intent: android.content.Intent?): Boolean {
@@ -121,6 +155,30 @@ class QueenAccessibilityService : AccessibilityService() {
             (t.contains("删除") && (t.contains("应用") || t.contains("app")))
     }
 
+    private fun maybeTriggerDeclarationChallenge(event: AccessibilityEvent) {
+        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        if (!DeclarationScheduler.isEnabled(this)) return
+        if (DailySelfieEnforcement.isBlockingAppUsage(this)) return
+        val pkg = event.packageName?.toString().orEmpty()
+        if (pkg == packageName) return
+
+        val km = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+        wasKeyguardLocked = km?.isKeyguardLocked != false
+
+        if (!DeclarationEnforcement.isScreenUsable(this)) return
+        if (!DeclarationScheduler.isDue(this) && !DeclarationScheduler.isPending(this)) return
+        DeclarationEnforcement.launchIfNeeded(this)
+    }
+
+    /** 未完成宣誓时：任何切到其他窗口立刻拉回宣誓页。 */
+    private fun maybeReassertDeclarationBlock(event: AccessibilityEvent) {
+        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        if (!DeclarationEnforcement.shouldReassertBlocking(this)) return
+        if (DailySelfieEnforcement.isBlockingAppUsage(this)) return
+        if (DeclarationEnforcement.challengeInForeground) return
+        DeclarationEnforcement.bringToFront(this)
+    }
+
     private fun isPowerRelatedWindow(pkg: String, cls: String): Boolean {
         if (pkg.contains("systemui", ignoreCase = true)) return true
         if (pkg == "android") return true
@@ -184,7 +242,10 @@ class QueenAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
+        val km = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+        wasKeyguardLocked = km?.isKeyguardLocked != false
         QueenDeviceAdminHelper.applyQueenPolicies(applicationContext)
+        DeclarationScheduler.ensureScheduleInitialized(applicationContext)
     }
 
     override fun onDestroy() {

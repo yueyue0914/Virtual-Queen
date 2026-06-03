@@ -46,6 +46,7 @@ object QueenReleaseManager {
         CalendarInjector.cancelInjectAlarms(context)
         CalendarInjector.unregisterDeletionWatch(context)
         DailySelfieScheduler.cancelAlarm(context)
+        DeclarationScheduler.clearOnRelease(context)
         QueenAccessibilityHelper.cancelAccessibilityNotification(context)
         QueenBatteryHelper.cancelBatteryNotification(context)
         QueenFloatingWindow.hide()

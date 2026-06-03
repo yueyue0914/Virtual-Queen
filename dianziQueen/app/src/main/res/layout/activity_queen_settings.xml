@@ -326,6 +326,135 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:text="@string/settings_declaration_title"
+                android:textColor="@color/crimson_glow"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/settings_declaration_subtitle"
+                android:textColor="@color/text_red_dim"
+                android:textSize="11sp" />
+
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/settingsDeclarationEnabledSwitch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/settings_declaration_enabled"
+                android:textColor="@color/text_red_primary" />
+
+            <RadioGroup
+                android:id="@+id/settingsDeclarationModeGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal">
+
+                <RadioButton
+                    android:id="@+id/settingsDeclarationModeRandom"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_declaration_mode_random"
+                    android:textColor="@color/text_red_primary" />
+
+                <RadioButton
+                    android:id="@+id/settingsDeclarationModeFixed"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:text="@string/settings_declaration_mode_fixed"
+                    android:textColor="@color/text_red_primary" />
+            </RadioGroup>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/settings_declaration_random_min_label"
+                android:textColor="@color/text_red_muted"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/settingsDeclarationRandomMinEdit"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_password_input"
+                android:inputType="number"
+                android:padding="10dp"
+                android:textColor="@color/text_red_primary" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/settings_declaration_random_max_label"
+                android:textColor="@color/text_red_muted"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/settingsDeclarationRandomMaxEdit"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_password_input"
+                android:inputType="number"
+                android:padding="10dp"
+                android:textColor="@color/text_red_primary" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/settings_declaration_fixed_label"
+                android:textColor="@color/text_red_muted"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/settingsDeclarationFixedEdit"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_password_input"
+                android:inputType="number"
+                android:padding="10dp"
+                android:textColor="@color/text_red_primary" />
+
+            <TextView
+                android:id="@+id/settingsDeclarationPreviewText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:textColor="@color/text_red_primary"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/settingsDeclarationSaveButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_submit_blood"
+                android:text="@string/settings_declaration_save_btn"
+                android:textAllCaps="false"
+                android:textColor="@color/submit_text_black"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/bg_access_frame"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:text="@string/settings_strong_control_title"
                 android:textColor="@color/crimson_glow"
                 android:textSize="15sp"

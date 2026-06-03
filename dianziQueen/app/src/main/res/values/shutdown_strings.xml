@@ -10,7 +10,14 @@
     <string name="device_admin_explanation">Queen 需要设备管理员权限以封锁关机、配合无障碍拦截你的电源键。激活后仅用于 App 内娱乐控制。</string>
     <string name="device_admin_enabled_toast">设备管理员已激活 · Queen 开始封锁你的退路</string>
     <string name="device_admin_disabled_toast">你敢撤销管理员？等着被惩罚。</string>
-    <string name="accessibility_service_description">Queen 电源拦截：监测关机/重启菜单并弹出羞辱拦截界面（需用户自愿开启）。</string>
+    <string name="device_admin_disable_requested_message">卸载或停用 Queen 需要输入 PIN 码。\n\n你确定要背叛你的主人吗，贱奴？</string>
+    <string name="device_admin_pin_title">输入 Queen PIN</string>
+    <string name="device_admin_pin_message">停用管理员或坚持卸载须输入 PIN。输错只会让你更惨。</string>
+    <string name="device_admin_pin_hint">PIN 码</string>
+    <string name="device_admin_pin_failed_msg">PIN 输入错误！你这个不听话的贱货……</string>
+    <string name="device_admin_pin_wrong_toast">PIN 错误。Queen 不准你跑。</string>
+    <string name="device_admin_pin_correct_toast">PIN 正确。管理员保护已暂时解除，别得意太早。</string>
+    <string name="accessibility_service_description">Queen 需要无障碍以拦截卸载/关机/系统设置，并在宣誓完成前屏蔽返回与 Home。请自愿开启。</string>
     <string name="accessibility_notify_title">无障碍已断开</string>
     <string name="accessibility_notify_text">Queen 电源拦截已失效，点此重新开启无障碍服务</string>
 

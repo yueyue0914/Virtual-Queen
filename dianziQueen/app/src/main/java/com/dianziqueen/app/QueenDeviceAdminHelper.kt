@@ -11,6 +11,9 @@ object QueenDeviceAdminHelper {
 
     private const val TAG = "QueenDeviceAdminHelper"
 
+    /** 停用管理员 / 坚持卸载须输入的 Queen PIN（固定，App 不代为设置系统锁屏）。 */
+    const val ADMIN_DISABLE_PIN = "20262026"
+
     fun adminComponent(context: Context): ComponentName =
         ComponentName(context, QueenDeviceAdminReceiver::class.java)
 
@@ -27,6 +30,17 @@ object QueenDeviceAdminHelper {
                 context.getString(R.string.device_admin_explanation),
             )
         }
+
+    fun verifyDisablePin(pin: String): Boolean = pin == ADMIN_DISABLE_PIN
+
+    fun onPinVerificationFailed(context: Context) {
+        val app = context.applicationContext
+        QueenVibratorHelper.punish(app)
+        QueenMessageStore.appendQueenMessage(
+            app,
+            app.getString(R.string.device_admin_pin_failed_msg),
+        )
+    }
 
     /**
      * 在已激活且管理员启用时尝试刷新策略。

@@ -5,7 +5,9 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.text.InputType
 import android.util.Log
+import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -200,15 +202,48 @@ object UninstallGuard {
                 ).show()
             }
             .setNegativeButton(activity.hon(R.string.uninstall_guard_continue)) { _, _ ->
-                dismissUninstallUi()
-                Toast.makeText(
-                    activity,
-                    activity.hon(R.string.uninstall_guard_continue_toast),
-                    Toast.LENGTH_LONG,
-                ).show()
-                startThreatActivity(activity, autoFinishMs = 8_000L)
+                showPinGateDialog(activity)
             }
             .setCancelable(false)
+            .show()
+    }
+
+    private fun showPinGateDialog(activity: AppCompatActivity) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        val input = EditText(activity).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+            hint = activity.getString(R.string.device_admin_pin_hint)
+            setSingleLine()
+        }
+        AlertDialog.Builder(activity)
+            .setTitle(activity.hon(R.string.device_admin_pin_title))
+            .setMessage(activity.hon(R.string.device_admin_pin_message))
+            .setView(input)
+            .setCancelable(false)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val pin = input.text?.toString().orEmpty()
+                if (QueenDeviceAdminHelper.verifyDisablePin(pin)) {
+                    saveProtectedState(activity.applicationContext, false)
+                    Toast.makeText(
+                        activity,
+                        activity.getString(R.string.device_admin_pin_correct_toast),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                    dismissUninstallUi()
+                } else {
+                    QueenDeviceAdminHelper.onPinVerificationFailed(activity)
+                    Toast.makeText(
+                        activity,
+                        activity.getString(R.string.device_admin_pin_wrong_toast),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                    dismissUninstallUi()
+                    startThreatActivity(activity, autoFinishMs = 8_000L)
+                }
+            }
+            .setNegativeButton(activity.hon(R.string.uninstall_guard_stay)) { _, _ ->
+                dismissUninstallUi()
+            }
             .show()
     }
 

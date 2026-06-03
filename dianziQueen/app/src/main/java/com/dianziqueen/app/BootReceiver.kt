@@ -13,6 +13,7 @@ class BootReceiver : BroadcastReceiver() {
         val app = context.applicationContext
         UninstallGuard.onBootCompleted(app)
         DailySelfieScheduler.ensureTodaySchedule(app)
+        DeclarationScheduler.ensureScheduleInitialized(app)
         val i = Intent(app, QueenService::class.java)
         app.startForegroundService(i)
         QueenKeepAlive.scheduleWatchdog(app)
@@ -69,5 +70,20 @@ object Prefs {
     const val QUEEN_SERVICE_HEARTBEAT_AT = "queen_service_heartbeat_at"
     /** 服务启动后是否已尝试弹出系统「忽略电池优化」（仅一次）。 */
     const val BATTERY_EXEMPTION_SERVICE_PROMPTED = "battery_exemption_service_prompted"
+    /** 宣言验证：是否启用（激活后默认 true）。 */
+    const val DECLARATION_ENABLED = "declaration_enabled"
+    /** 宣言验证间隔模式：random | fixed */
+    const val DECLARATION_MODE = "declaration_mode"
+    const val DECLARATION_RANDOM_MIN_MINUTES = "declaration_random_min_minutes"
+    const val DECLARATION_RANDOM_MAX_MINUTES = "declaration_random_max_minutes"
+    const val DECLARATION_FIXED_MINUTES = "declaration_fixed_minutes"
+    /** 下次宣言验证触发时间（毫秒）。 */
+    const val DECLARATION_NEXT_AT = "declaration_next_at"
+    /** 上次通过宣言验证的时间（毫秒）。 */
+    const val DECLARATION_LAST_PASSED_AT = "declaration_last_passed_at"
+    /** 当前是否有未完成的宣言验证（须输入正确才能用手机）。 */
+    const val DECLARATION_CHALLENGE_PENDING = "declaration_challenge_pending"
+    /** 当前待输入的宣言（触发验证时已随机抽取并固定）。 */
+    const val DECLARATION_CURRENT_TEXT = "declaration_current_text"
     const val QUEEN_HONORIFIC_PRESET = "queen_honorific_preset"
 }
