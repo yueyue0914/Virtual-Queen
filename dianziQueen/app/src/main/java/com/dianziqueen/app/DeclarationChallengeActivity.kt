@@ -28,13 +28,25 @@ class DeclarationChallengeActivity : AppCompatActivity() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var passed = false
+    private var closing = false
     private lateinit var requiredText: String
+    private lateinit var submitButton: Button
+    private lateinit var declarationInput: EditText
+
+    private val backPressedCallback = object : OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() {
+            punishEscapeAttempt()
+        }
+    }
 
     private val relaunchRunnable = Runnable {
-        if (passed) return@Runnable
-        if (DeclarationEnforcement.shouldReassertBlocking(this)) {
-            DeclarationEnforcement.bringToFront(applicationContext)
-        }
+        if (isFinishingOrClosed()) return@Runnable
+        if (!DeclarationEnforcement.shouldReassertBlocking(applicationContext)) return@Runnable
+        DeclarationEnforcement.bringToFront(applicationContext)
+    }
+
+    private val finishRunnable = Runnable {
+        closeActivitySafely()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,22 +62,14 @@ class DeclarationChallengeActivity : AppCompatActivity() {
         setContentView(R.layout.activity_declaration_challenge)
         applyBlockingWindow()
 
-        onBackPressedDispatcher.addCallback(
-            this,
-            object : OnBackPressedCallback(true) {
-                override fun handleOnBackPressed() {
-                    punishEscapeAttempt()
-                }
-            },
-        )
-
+        onBackPressedDispatcher.addCallback(this, backPressedCallback)
         bindUi()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (passed) {
-            finish()
+        if (isFinishingOrClosed()) {
+            closeActivitySafely()
             return
         }
         setIntent(intent)
@@ -78,8 +82,8 @@ class DeclarationChallengeActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (passed) {
-            finish()
+        if (isFinishingOrClosed()) {
+            closeActivitySafely()
             return
         }
         DeclarationEnforcement.challengeInForeground = true
@@ -112,16 +116,11 @@ class DeclarationChallengeActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         DeclarationEnforcement.challengeInForeground = false
-        if (!passed) {
+        handler.removeCallbacksAndMessages(null)
+        if (!isFinishingOrClosed()) {
             DeclarationHardBlockHelper.exit(this)
         }
-        handler.removeCallbacks(relaunchRunnable)
         super.onDestroy()
-        if (!passed && DeclarationEnforcement.shouldReassertBlocking(this)) {
-            handler.post {
-                DeclarationEnforcement.bringToFront(applicationContext)
-            }
-        }
     }
 
     private fun bindUi() {
@@ -129,46 +128,71 @@ class DeclarationChallengeActivity : AppCompatActivity() {
             getString(R.string.declaration_challenge_title)
         findViewById<TextView>(R.id.tvDeclaration).text =
             getString(R.string.declaration_challenge_prompt_fmt, requiredText)
-        val input = findViewById<EditText>(R.id.etDeclaration)
-        findViewById<Button>(R.id.btnSubmit).setOnClickListener {
-            val typed = input.text?.toString()?.trim().orEmpty()
+        declarationInput = findViewById(R.id.etDeclaration)
+        submitButton = findViewById(R.id.btnSubmit)
+        submitButton.setOnClickListener {
+            if (isFinishingOrClosed()) return@setOnClickListener
+            val typed = declarationInput.text?.toString()?.trim().orEmpty()
             if (typed.equals(requiredText, ignoreCase = true)) {
-                completeChallengeSuccessfully()
+                onDeclarationSuccess()
             } else {
                 Toast.makeText(this, R.string.declaration_challenge_wrong, Toast.LENGTH_LONG).show()
-                input.text?.clear()
+                declarationInput.text?.clear()
                 vibratePunish()
             }
         }
     }
 
-    private fun completeChallengeSuccessfully() {
-        if (passed) return
+    private fun onDeclarationSuccess() {
+        if (isFinishingOrClosed()) return
+        closing = true
         passed = true
-        handler.removeCallbacks(relaunchRunnable)
+        backPressedCallback.isEnabled = false
+        submitButton.isEnabled = false
+        declarationInput.isEnabled = false
+        handler.removeCallbacksAndMessages(null)
         DeclarationScheduler.markChallengePassed(this)
         DeclarationHardBlockHelper.exit(this)
         Toast.makeText(this, R.string.declaration_challenge_ok, Toast.LENGTH_SHORT).show()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            finishAndRemoveTask()
-        } else {
-            @Suppress("DEPRECATION")
-            finish()
+        handler.postDelayed(finishRunnable, FINISH_DELAY_MS)
+    }
+
+    /** 在主线程延迟关闭，避免部分机型 finish 与 onPause/拉回竞态。 */
+    private fun closeActivitySafely() {
+        if (isFinishing) return
+        runOnUiThread {
+            if (isFinishing) return@runOnUiThread
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    finishAndRemoveTask()
+                } else {
+                    @Suppress("DEPRECATION")
+                    finish()
+                }
+            } catch (_: Exception) {
+                finish()
+            }
         }
     }
 
+    private fun isFinishingOrClosed(): Boolean = passed || closing || isFinishing
+
     private fun reassertBlockingImmediate() {
-        if (passed) return
-        if (!DeclarationEnforcement.shouldReassertBlocking(this)) return
+        if (isFinishingOrClosed()) return
+        if (!DeclarationEnforcement.shouldReassertBlocking(applicationContext)) return
         handler.removeCallbacks(relaunchRunnable)
         handler.post {
-            DeclarationEnforcement.bringToFront(applicationContext)
+            if (!isFinishingOrClosed() &&
+                DeclarationEnforcement.shouldReassertBlocking(applicationContext)
+            ) {
+                DeclarationEnforcement.bringToFront(applicationContext)
+            }
         }
         handler.postDelayed(relaunchRunnable, DeclarationEnforcement.REASSERT_DELAY_MS)
     }
 
     private fun punishEscapeAttempt() {
-        if (passed) return
+        if (isFinishingOrClosed()) return
         vibratePunish()
         Toast.makeText(this, R.string.declaration_challenge_escape_denied, Toast.LENGTH_SHORT).show()
         reassertBlockingImmediate()
@@ -211,5 +235,9 @@ class DeclarationChallengeActivity : AppCompatActivity() {
             @Suppress("DEPRECATION")
             vibrator.vibrate(longArrayOf(0, 180, 80, 220), -1)
         }
+    }
+
+    companion object {
+        private const val FINISH_DELAY_MS = 300L
     }
 }

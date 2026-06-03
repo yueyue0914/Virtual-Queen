@@ -3,36 +3,49 @@ package com.dianziqueen.app
 import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.PowerManager
+import android.os.SystemClock
 
 object DeclarationEnforcement {
 
     /** 逃离宣誓页后再次拉回的间隔（毫秒）。 */
     const val REASSERT_DELAY_MS = 500L
 
+    /** 通过后临时豁免拉回（毫秒），防止与 finish/onDestroy 竞态。 */
+    private const val PASS_EXEMPT_MS = 3_000L
+
     /** 宣誓页是否在前台（仅此时不重复 startActivity）。 */
     @Volatile
     var challengeInForeground: Boolean = false
 
-    /** 已通过宣誓、正在关闭页面：禁止再拉回。 */
+    /** 已通过宣誓：内存态优先，任何拉回逻辑立即失效。 */
     @Volatile
     private var passCompleted: Boolean = false
+
+    @Volatile
+    private var passExemptUntilElapsed: Long = 0L
 
     fun notifyChallengePassed() {
         passCompleted = true
         challengeInForeground = false
+        passExemptUntilElapsed = SystemClock.elapsedRealtime() + PASS_EXEMPT_MS
     }
 
     fun notifyChallengeShown() {
         passCompleted = false
+        passExemptUntilElapsed = 0L
     }
 
+    /** 是否仍处于「须拦截/拉回」状态；内存通行证优先于 Prefs。 */
     fun shouldReassertBlocking(context: Context): Boolean {
         if (passCompleted) return false
+        if (SystemClock.elapsedRealtime() < passExemptUntilElapsed) return false
         return DeclarationScheduler.shouldBlockUsage(context)
     }
 
     fun launchIfNeeded(context: Context) {
+        if (passCompleted) return
         if (!DeclarationScheduler.isEnabled(context)) return
         if (DailySelfieEnforcement.isBlockingAppUsage(context)) return
         if (challengeInForeground) return
@@ -64,6 +77,9 @@ object DeclarationEnforcement {
             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
             addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+            }
             putExtra(
                 DeclarationScheduler.EXTRA_REQUIRED_DECLARATION,
                 DeclarationScheduler.currentDeclarationText(context),

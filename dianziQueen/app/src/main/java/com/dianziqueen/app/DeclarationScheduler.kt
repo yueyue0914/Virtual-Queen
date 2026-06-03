@@ -80,8 +80,8 @@ object DeclarationScheduler {
     }
 
     fun markChallengePassed(context: Context) {
-        pendingInMemory = false
         DeclarationEnforcement.notifyChallengePassed()
+        pendingInMemory = false
         val now = System.currentTimeMillis()
         prefs(context).edit()
             .putLong(Prefs.DECLARATION_LAST_PASSED_AT, now)
