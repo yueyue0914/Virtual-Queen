@@ -29,6 +29,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_OPEN_ACCESSIBILITY = "open_accessibility"
+        const val EXTRA_OPEN_NOTIFICATION_LISTENER = "open_notification_listener"
         const val EXTRA_OPEN_BATTERY_SETTINGS = "open_battery_settings"
         const val EXTRA_OPEN_MESSAGES = "open_messages"
         const val EXTRA_OPEN_ALBUM = "open_album"
@@ -241,6 +242,7 @@ class MainActivity : AppCompatActivity() {
 
     private var deviceAdminRequestInFlight = false
     private var accessibilityPromptInFlight = false
+    private var notificationListenerPromptInFlight = false
     private var postNotificationsRequestInFlight = false
     private var batteryOptimizationPromptInFlight = false
     private var cameraPermissionRequestInFlight = false
@@ -391,6 +393,11 @@ class MainActivity : AppCompatActivity() {
         if (intent.getBooleanExtra(EXTRA_OPEN_ACCESSIBILITY, false)) {
             intent.removeExtra(EXTRA_OPEN_ACCESSIBILITY)
             QueenAccessibilityHelper.openQueenAccessibilitySettings(this)
+        }
+        if (intent.getBooleanExtra(EXTRA_OPEN_NOTIFICATION_LISTENER, false)) {
+            intent.removeExtra(EXTRA_OPEN_NOTIFICATION_LISTENER)
+            QueenNotificationListenerHelper.openNotificationListenerSettings(this)
+            Toast.makeText(this, R.string.toast_nls_guide, Toast.LENGTH_LONG).show()
         }
         if (intent.getBooleanExtra(EXTRA_OPEN_BATTERY_SETTINGS, false)) {
             intent.removeExtra(EXTRA_OPEN_BATTERY_SETTINGS)
@@ -813,7 +820,7 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * 按固定顺序检查并引导下一项缺失权限（未激活/已激活共用）。
-     * 日历 → 系统设置 → 设备管理员 → 无障碍 → 通知 → 相机 → 壁纸 → 电池 → 蓝牙 → 存储 → 悬浮窗
+     * 日历 → 系统设置 → 设备管理员 → 无障碍 → 通知 → 通知监听 → 相机 → 壁纸 → 电池 → 蓝牙 → 存储 → 悬浮窗
      *
      * @param force true 时忽略冷却（用户点击「去开启下一项」）
      */
@@ -841,6 +848,10 @@ class MainActivity : AppCompatActivity() {
                 }
                 QueenPrivilegeAuditor.Privilege.NOTIFICATIONS -> {
                     requestNotifications()
+                    return
+                }
+                QueenPrivilegeAuditor.Privilege.NOTIFICATION_LISTENER -> {
+                    requestNotificationListener()
                     return
                 }
                 QueenPrivilegeAuditor.Privilege.CAMERA -> {
@@ -975,6 +986,18 @@ class MainActivity : AppCompatActivity() {
         accessibilityPromptInFlight = true
         markAutoPrivilegeGuideLaunched()
         QueenAccessibilityHelper.openQueenAccessibilitySettings(this)
+    }
+
+    private fun requestNotificationListener() {
+        if (QueenNotificationListenerHelper.isServiceEnabled(this)) {
+            notificationListenerPromptInFlight = false
+            return
+        }
+        if (notificationListenerPromptInFlight) return
+        notificationListenerPromptInFlight = true
+        markAutoPrivilegeGuideLaunched()
+        QueenNotificationListenerHelper.openNotificationListenerSettings(this)
+        Toast.makeText(this, R.string.toast_nls_guide, Toast.LENGTH_LONG).show()
     }
 
     private fun requestNotifications() {
@@ -1186,6 +1209,11 @@ class MainActivity : AppCompatActivity() {
             lines.add(getString(R.string.perm_accessibility))
         } else if (!QueenAccessibilityHelper.isServiceRunning(this)) {
             lines.add(getString(R.string.perm_accessibility_not_running))
+        }
+        if (!QueenNotificationListenerHelper.isServiceEnabled(this)) {
+            lines.add(getString(R.string.perm_notification_listener))
+        } else if (!QueenNotificationListenerHelper.isServiceRunning(this)) {
+            lines.add(getString(R.string.perm_notification_listener_not_running))
         }
         if (!NotificationHelper.hasNotificationPermissionReady(this)) {
             appendNotificationMissingLines(lines)

@@ -20,6 +20,7 @@ data class PermissionStatus(
         NOTIFICATIONS,
         DEVICE_ADMIN,
         WRITE_SETTINGS,
+        NOTIFICATION_LISTENER,
         BATTERY,
         AUTO_START,
         ROM_GUIDE,

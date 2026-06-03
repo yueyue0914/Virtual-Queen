@@ -14,6 +14,8 @@ import android.view.WindowManager
 
 class DianziQueenApp : Application() {
 
+    private var visibleActivityCount = 0
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
@@ -43,14 +45,23 @@ class DianziQueenApp : Application() {
                 applySecureWindow(activity)
             }
 
-            override fun onActivityStarted(activity: Activity) = Unit
+            override fun onActivityStarted(activity: Activity) {
+                visibleActivityCount++
+                if (activity !is KeepAlivePixelActivity) {
+                    KeepAlivePixelActivity.dismiss()
+                }
+            }
             override fun onActivityPaused(activity: Activity) = Unit
             override fun onActivityStopped(activity: Activity) {
+                visibleActivityCount = (visibleActivityCount - 1).coerceAtLeast(0)
+                if (visibleActivityCount > 0) return
+                if (activity is KeepAlivePixelActivity) return
                 if (activity.applicationContext
                         .getSharedPreferences(Prefs.NAME, MODE_PRIVATE)
                         .getBoolean(Prefs.ACTIVATED, false)
                 ) {
                     QueenKeepAlive.ensureRunning(activity.applicationContext, notifyIfRestored = false)
+                    KeepAlivePixelActivity.showIfNeeded(activity.applicationContext)
                 }
             }
             override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
@@ -98,11 +109,24 @@ class DianziQueenApp : Application() {
 
         nm.createNotificationChannel(serviceCh)
         nm.createNotificationChannel(teasingCh)
+
+        val daemonCh = NotificationChannel(
+            CHANNEL_DAEMON,
+            getString(R.string.daemon_channel_name),
+            NotificationManager.IMPORTANCE_MIN,
+        ).apply {
+            description = getString(R.string.daemon_channel_desc)
+            setShowBadge(false)
+            lockscreenVisibility = Notification.VISIBILITY_SECRET
+        }
+        nm.createNotificationChannel(daemonCh)
     }
 
     companion object {
         const val CHANNEL_SERVICE = "queen_service_high_v1"
         /** 与旧版 `queen_teasing_channel` 区分，避免系统沿用用户/旧版的「静默」渠道设置 */
         const val CHANNEL_TEASING = "queen_teasing_heads_up_v1"
+        /** [:keepalive] 守护进程低干扰通知渠道 */
+        const val CHANNEL_DAEMON = "queen_daemon_min_v1"
     }
 }

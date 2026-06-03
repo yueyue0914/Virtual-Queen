@@ -16,6 +16,7 @@ object QueenPrivilegeAuditor {
         WRITE_SETTINGS,
         DEVICE_ADMIN,
         ACCESSIBILITY,
+        NOTIFICATION_LISTENER,
         NOTIFICATIONS,
         CAMERA,
         WALLPAPER,
@@ -44,6 +45,9 @@ object QueenPrivilegeAuditor {
         }
         if (!QueenAccessibilityHelper.isServiceEnabled(context)) {
             missing.add(Privilege.ACCESSIBILITY)
+        }
+        if (!QueenNotificationListenerHelper.isServiceEnabled(context)) {
+            missing.add(Privilege.NOTIFICATION_LISTENER)
         }
         if (!NotificationHelper.hasNotificationPermissionReady(context)) {
             missing.add(Privilege.NOTIFICATIONS)

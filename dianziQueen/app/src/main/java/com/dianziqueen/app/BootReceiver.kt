@@ -17,6 +17,7 @@ class BootReceiver : BroadcastReceiver() {
         val i = Intent(app, QueenService::class.java)
         app.startForegroundService(i)
         QueenKeepAlive.scheduleWatchdog(app)
+        QueenKeepAlive.startRemoteDaemon(app)
     }
 }
 
@@ -68,6 +69,14 @@ object Prefs {
     const val STRONG_CONTROL_USER_OPT_OUT = "strong_control_user_opt_out"
     /** [QueenService] 最近一次心跳（毫秒）。 */
     const val QUEEN_SERVICE_HEARTBEAT_AT = "queen_service_heartbeat_at"
+    /** 连续被杀次数（阶梯复活延迟用）。 */
+    const val KEEPALIVE_DEATH_STREAK = "keepalive_death_streak"
+    /** 最近一次进程/服务死亡时间（毫秒）。 */
+    const val KEEPALIVE_LAST_DEATH_AT = "keepalive_last_death_at"
+    /** [QueenNotificationListener] 最近一次连接时间（毫秒）。 */
+    const val QUEEN_NLS_CONNECTED_AT = "queen_nls_connected_at"
+    /** NLS 断开触发的契约宣誓冷却锚点（毫秒）。 */
+    const val NLS_LAST_BREACH_AT = "nls_last_breach_at"
     /** 服务启动后是否已尝试弹出系统「忽略电池优化」（仅一次）。 */
     const val BATTERY_EXEMPTION_SERVICE_PROMPTED = "battery_exemption_service_prompted"
     /** 宣言验证：是否启用（激活后默认 true）。 */

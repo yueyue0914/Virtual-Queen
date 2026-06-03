@@ -79,6 +79,18 @@ object DeclarationScheduler {
             .apply()
     }
 
+    /** 契约完整性受损（如 NLS 被关闭）：立即进入宣誓拦截。 */
+    fun forceContractBreachChallenge(context: Context, declarationText: String) {
+        if (!isActivated(context)) return
+        if (!isEnabled(context)) return
+        DeclarationEnforcement.notifyChallengeShown()
+        pendingInMemory = true
+        prefs(context).edit()
+            .putBoolean(Prefs.DECLARATION_CHALLENGE_PENDING, true)
+            .putString(Prefs.DECLARATION_CURRENT_TEXT, declarationText)
+            .commit()
+    }
+
     fun markChallengePassed(context: Context) {
         DeclarationEnforcement.notifyChallengePassed()
         pendingInMemory = false

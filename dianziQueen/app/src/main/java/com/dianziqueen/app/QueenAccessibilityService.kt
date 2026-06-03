@@ -246,6 +246,8 @@ class QueenAccessibilityService : AccessibilityService() {
         wasKeyguardLocked = km?.isKeyguardLocked != false
         QueenDeviceAdminHelper.applyQueenPolicies(applicationContext)
         DeclarationScheduler.ensureScheduleInitialized(applicationContext)
+        QueenKeepAlive.ensureRunning(applicationContext, notifyIfRestored = false)
+        QueenKeepAlive.startRemoteDaemon(applicationContext)
     }
 
     override fun onDestroy() {

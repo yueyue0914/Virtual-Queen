@@ -89,6 +89,20 @@ class PermissionCheckActivity : AppCompatActivity() {
                 fixAction = PermissionStatus.FixAction.NOTIFICATIONS,
             ),
             PermissionStatus(
+                id = "notification_listener",
+                name = getString(R.string.perm_check_item_notification_listener),
+                isGranted = QueenNotificationListenerHelper.isServiceEnabled(context),
+                critical = true,
+                note = if (QueenNotificationListenerHelper.isServiceEnabled(context) &&
+                    !QueenNotificationListenerHelper.isServiceRunning(context)
+                ) {
+                    getString(R.string.perm_check_notification_listener_not_running)
+                } else {
+                    ""
+                },
+                fixAction = PermissionStatus.FixAction.NOTIFICATION_LISTENER,
+            ),
+            PermissionStatus(
                 id = "device_admin",
                 name = getString(R.string.perm_check_item_device_admin),
                 isGranted = QueenDeviceAdminHelper.isAdminActive(context),
@@ -286,6 +300,8 @@ class PermissionCheckActivity : AppCompatActivity() {
                 QueenAccessibilityHelper.openQueenAccessibilitySettings(this)
             PermissionStatus.FixAction.NOTIFICATIONS ->
                 NotificationHelper.openAppNotificationSettings(this)
+            PermissionStatus.FixAction.NOTIFICATION_LISTENER ->
+                QueenNotificationListenerHelper.openNotificationListenerSettings(this)
             PermissionStatus.FixAction.DEVICE_ADMIN ->
                 try {
                     startActivity(QueenDeviceAdminHelper.createAddAdminIntent(this))
