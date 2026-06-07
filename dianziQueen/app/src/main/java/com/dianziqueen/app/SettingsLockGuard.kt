@@ -31,10 +31,11 @@ object SettingsLockGuard {
         return prefs.getBoolean(Prefs.STRONG_CONTROL_ENABLED, true)
     }
 
-    /** 激活完成时调用：仅当用户从未手动关闭时才默认开启。 */
+    /** 激活完成时调用：仅当用户从未手动关闭时才默认开启拦截。 */
     fun ensureStrongControlOnActivation(context: Context) {
         if (isUserOptedOut(context)) return
         enableStrongControl(context)
+        UninstallGuard.enableProtection(context)
     }
 
     fun enableStrongControl(context: Context) {
@@ -51,6 +52,18 @@ object SettingsLockGuard {
             .putBoolean(Prefs.STRONG_CONTROL_ENABLED, false)
             .putBoolean(Prefs.STRONG_CONTROL_USER_OPT_OUT, true)
             .apply()
+        releaseAllInterceptBlocks(context)
+    }
+
+    /** 关闭最强控制时：卸载/关机/PIN 门/设置警告等全部解除。 */
+    fun releaseAllInterceptBlocks(context: Context) {
+        val app = context.applicationContext
+        UninstallGuard.disableProtection(app)
+        AdminDisablePinSession.revoke(app)
+        pendingOverlayRunnable?.let { handler.removeCallbacks(it) }
+        pendingOverlayRunnable = null
+        SettingsBlockOverlay.hide()
+        Log.i(TAG, "all intercept blocks released")
     }
 
     private fun isUserOptedOut(context: Context): Boolean =

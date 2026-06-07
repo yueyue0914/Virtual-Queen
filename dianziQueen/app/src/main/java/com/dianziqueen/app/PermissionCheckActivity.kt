@@ -48,6 +48,11 @@ class PermissionCheckActivity : AppCompatActivity() {
 
     private fun buildPermissionChecks(context: Context): List<PermissionStatus> {
         val manualNote = getString(R.string.perm_check_manual_note)
+        val autostartNote = if (RomPermissionUtils.isXiaomi()) {
+            getString(R.string.perm_check_xiaomi_autostart_note)
+        } else {
+            manualNote
+        }
         val activated = context.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
             .getBoolean(Prefs.ACTIVATED, false)
 
@@ -122,7 +127,7 @@ class PermissionCheckActivity : AppCompatActivity() {
                 name = getString(R.string.perm_check_item_battery),
                 isGranted = QueenBatteryHelper.isExemptFromBatteryOptimizations(context),
                 critical = true,
-                note = romProbeNote(context, "battery"),
+                note = buildBatteryNote(context),
                 fixAction = PermissionStatus.FixAction.BATTERY,
             ),
         )
@@ -150,7 +155,7 @@ class PermissionCheckActivity : AppCompatActivity() {
                 name = getString(R.string.perm_check_item_autostart),
                 isGranted = true,
                 manualOnly = true,
-                note = manualNote,
+                note = autostartNote,
                 fixAction = PermissionStatus.FixAction.AUTO_START,
             ),
         )
@@ -212,6 +217,18 @@ class PermissionCheckActivity : AppCompatActivity() {
                 getString(R.string.perm_check_rom_long_press_confirm)
             else -> ""
         }
+    }
+
+    private fun buildBatteryNote(context: Context): String {
+        val parts = mutableListOf<String>()
+        val probe = romProbeNote(context, "battery")
+        if (probe.isNotBlank()) parts.add(probe)
+        if (RomPermissionUtils.isXiaomi() &&
+            !QueenBatteryHelper.isExemptFromBatteryOptimizations(context)
+        ) {
+            parts.add(getString(R.string.perm_check_xiaomi_battery_note))
+        }
+        return parts.joinToString("\n")
     }
 
     private fun renderPermissionList(checks: List<PermissionStatus>) {

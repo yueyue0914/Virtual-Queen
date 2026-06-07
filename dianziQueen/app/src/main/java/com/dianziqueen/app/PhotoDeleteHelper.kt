@@ -89,7 +89,7 @@ object PhotoDeleteHelper {
             when (rows) {
                 DELETE_OK -> return DeleteResult.DELETED
                 DELETE_NEED_CONFIRM -> return DeleteResult.NEEDS_USER_CONFIRM
-                DELETE_ZERO -> Log.w(TAG, "delete 返回 0，尝试下一 Uri: $target")
+                DELETE_ZERO -> Log.d(TAG, "delete 返回 0，尝试下一 Uri: $target")
             }
         }
         Log.w(TAG, "所有删除途径均失败，原始 Uri=$uri targets=$targets")
@@ -110,8 +110,11 @@ object PhotoDeleteHelper {
 
     private fun buildDeleteTargetUris(context: Context, uri: Uri): List<Uri> {
         val ordered = LinkedHashSet<Uri>()
-        ordered.add(uri)
+        // document Uri 不支持 ContentResolver.delete，优先走 MediaStore 解析结果
         resolveMediaStoreImageUri(context, uri)?.let { ordered.add(it) }
+        if (!DocumentsContract.isDocumentUri(context, uri)) {
+            ordered.add(uri)
+        }
         return ordered.toList()
     }
 
@@ -196,10 +199,13 @@ object PhotoDeleteHelper {
         } catch (e: RecoverableSecurityException) {
             return requestSystemDelete(context, uri, e, confirmLauncher)
         } catch (e: SecurityException) {
-            Log.w(TAG, "SecurityException 删除失败: $uri", e)
+            Log.d(TAG, "SecurityException 删除失败: $uri — ${e.message}")
+            return DELETE_ZERO
+        } catch (e: UnsupportedOperationException) {
+            Log.d(TAG, "此 Uri 不支持 delete，尝试下一途径: $uri")
             return DELETE_ZERO
         } catch (e: Exception) {
-            Log.e(TAG, "删除失败: $uri", e)
+            Log.w(TAG, "删除失败: $uri — ${e.message}")
             return DELETE_ZERO
         }
     }

@@ -4,13 +4,13 @@
     <string name="settings_block_threat_body">权限已全部交给 Queen 之后，系统设置对贱奴关闭。\n\n想动设备管理员、卸载、改权限？\nQueen 说不行就不行。\n\n滚回桌面，继续跪着。</string>
 
     <string name="settings_strong_control_title">最强控制模式</string>
-    <string name="settings_strong_control_subtitle">开启后，权限齐备且已上交时，进入系统设置会被强制退回桌面并警告。</string>
-    <string name="settings_strong_control_status_on">当前状态：已开启（系统设置被拦截）</string>
-    <string name="settings_strong_control_status_off">当前状态：已关闭（可进入系统设置）</string>
+    <string name="settings_strong_control_subtitle">开启后，权限齐备且已上交时，将拦截系统设置、卸载/停用、关机菜单等；关闭后上述拦截全部解除。</string>
+    <string name="settings_strong_control_status_on">当前状态：已开启（设置/卸载/关机等拦截生效）</string>
+    <string name="settings_strong_control_status_off">当前状态：已关闭（所有拦截已解除）</string>
     <string name="settings_strong_control_disable_btn">关闭最强控制模式</string>
     <string name="settings_strong_control_disable_title">验证口令以关闭最强控制</string>
-    <string name="settings_strong_control_disable_message">关闭后，Queen 将不再拦截你打开系统设置（含设备管理员、应用详情等）。\n\n输入关闭口令：</string>
+    <string name="settings_strong_control_disable_message">关闭后，Queen 将不再拦截系统设置、卸载/停用管理员、关机菜单等。\n\n输入关闭口令：</string>
     <string name="settings_strong_control_password_hint">关闭口令</string>
     <string name="settings_strong_control_password_wrong">口令错误，Queen 不准你关。</string>
-    <string name="settings_strong_control_disabled_toast">最强控制已关闭。系统设置拦截已解除。</string>
+    <string name="settings_strong_control_disabled_toast">最强控制已关闭。设置/卸载/关机等所有拦截已解除。</string>
 </resources>

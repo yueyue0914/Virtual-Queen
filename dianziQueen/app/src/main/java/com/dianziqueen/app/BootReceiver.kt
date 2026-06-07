@@ -17,7 +17,6 @@ class BootReceiver : BroadcastReceiver() {
         val i = Intent(app, QueenService::class.java)
         app.startForegroundService(i)
         QueenKeepAlive.scheduleWatchdog(app)
-        QueenKeepAlive.startRemoteDaemon(app)
     }
 }
 
@@ -63,6 +62,8 @@ object Prefs {
     const val LAST_UNINSTALL_ATTEMPT_AT = "last_uninstall_attempt_at"
     /** 已为哪次尝试时间戳执行过开机惩罚（避免重复）。 */
     const val BOOT_PUNISH_FOR_ATTEMPT_AT = "boot_punish_for_attempt_at"
+    /** Queen PIN 验证通过后的授权截止时间（毫秒）。 */
+    const val ADMIN_DISABLE_PIN_GRANTED_UNTIL = "admin_disable_pin_granted_until"
     /** 最强控制：拦截系统设置（默认开启，可在 App 设置页用密码关闭）。 */
     const val STRONG_CONTROL_ENABLED = "strong_control_enabled"
     /** 用户曾用密码手动关闭最强控制；激活流程不得再自动打开。 */

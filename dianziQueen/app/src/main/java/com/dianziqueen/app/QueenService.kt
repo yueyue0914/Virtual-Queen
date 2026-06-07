@@ -3,10 +3,8 @@ package com.dianziqueen.app
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.ServiceConnection
 import android.os.IBinder
 import android.content.IntentFilter
 import android.graphics.Color
@@ -26,7 +24,7 @@ class QueenService : Service() {
     private lateinit var fakeCamera: FakeCameraIndicator
     private lateinit var imageGen: TeasingImageGenerator
     private var notificationId = 2000
-    private var remoteConnection: ServiceConnection? = null
+    private var foregroundStarted = false
 
     private val keepAliveHeartbeatRunnable = object : Runnable {
         override fun run() {
@@ -333,16 +331,15 @@ class QueenService : Service() {
         override fun run() {
             if (!isActivated()) return
             DeclarationScheduler.ensureScheduleInitialized(this@QueenService)
-            DeclarationEnforcement.launchIfNeeded(this@QueenService)
-            if (DeclarationEnforcement.shouldReassertBlocking(this@QueenService)) {
+            if (!DeclarationEnforcement.shouldReassertBlocking(this@QueenService)) {
+                DeclarationEnforcement.launchIfNeeded(this@QueenService)
+                handler.postDelayed(this, DECLARATION_CHECK_MS)
+                return
+            }
+            if (!DeclarationEnforcement.challengeInForeground) {
                 DeclarationEnforcement.bringToFront(this@QueenService)
             }
-            val delay = if (DeclarationEnforcement.shouldReassertBlocking(this@QueenService)) {
-                DECLARATION_ESCAPE_CHECK_MS
-            } else {
-                DECLARATION_CHECK_MS
-            }
-            handler.postDelayed(this, delay)
+            handler.postDelayed(this, DECLARATION_ESCAPE_CHECK_MS)
         }
     }
 
@@ -367,10 +364,9 @@ class QueenService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForegroundInternal()
+        ensureForegroundStarted()
         maybeRequestBatteryExemptionOnce()
         tryAutoInjectCalendar()
-        QueenDeviceAdminHelper.applyQueenPolicies(this)
         if (isActivated()) {
             QueenDeviceNameHelper.applyQueenDeviceName(this)
         }
@@ -380,9 +376,6 @@ class QueenService : Service() {
             ensureWallpaperChangeMonitor()
         }
         handler.post(keepAliveHeartbeatRunnable)
-        if (isActivated()) {
-            bindKeepAliveRemote()
-        }
         return START_STICKY
     }
 
@@ -397,6 +390,7 @@ class QueenService : Service() {
 
     override fun onDestroy() {
         alive = false
+        foregroundStarted = false
         handler.removeCallbacks(keepAliveHeartbeatRunnable)
         handler.removeCallbacks(calendarInjectRunnable)
         handler.removeCallbacks(wallpaperRunnable)
@@ -412,7 +406,6 @@ class QueenService : Service() {
         CalendarInjector.unregisterDeletionWatch(this)
         fakeCamera.hideDot()
         QueenFloatingWindow.hide()
-        unbindKeepAliveRemote()
         if (isActivated()) {
             QueenKeepAlive.requestDelayedRestart(applicationContext, "onDestroy")
         }
@@ -448,45 +441,9 @@ class QueenService : Service() {
         DeclarationEnforcement.launchIfNeeded(context)
     }
 
-    private fun bindKeepAliveRemote() {
-        QueenKeepAlive.startRemoteDaemon(this)
-        if (remoteConnection != null) return
-        val conn = object : ServiceConnection {
-            override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-                QueenKeepAlive.resetDeathStreak(applicationContext)
-            }
-
-            override fun onServiceDisconnected(name: ComponentName?) {
-                remoteConnection = null
-                if (!isActivated()) return
-                android.util.Log.w("QueenService", ":keepalive remote disconnected")
-                QueenKeepAlive.recordDeath(applicationContext, "keepalive_link_lost")
-                QueenKeepAlive.startRemoteDaemon(this@QueenService)
-                handler.postDelayed({ bindKeepAliveRemote() }, 500L)
-            }
-        }
-        remoteConnection = conn
-        try {
-            bindService(
-                Intent(this, QueenRemoteService::class.java),
-                conn,
-                Context.BIND_AUTO_CREATE,
-            )
-        } catch (e: Exception) {
-            android.util.Log.w("QueenService", "bind QueenRemoteService failed: ${e.message}")
-            remoteConnection = null
-        }
-    }
-
-    private fun unbindKeepAliveRemote() {
-        val conn = remoteConnection ?: return
-        remoteConnection = null
-        try {
-            unbindService(conn)
-        } catch (_: Exception) { }
-    }
-
-    private fun startForegroundInternal() {
+    private fun ensureForegroundStarted() {
+        if (foregroundStarted) return
+        foregroundStarted = true
         val tap = Intent(this, MainActivity::class.java)
         val pi = PendingIntent.getActivity(
             this, 0, tap,
@@ -719,7 +676,8 @@ class QueenService : Service() {
         private const val RINGTONE_CHECK_MS = 900_000L
         private const val DAILY_SELFIE_CHECK_MS = 8_000L
         private const val DECLARATION_CHECK_MS = 45_000L
-        private const val DECLARATION_ESCAPE_CHECK_MS = DeclarationEnforcement.REASSERT_DELAY_MS
+        /** 宣誓未完成时的复检间隔（与 [DeclarationEnforcement] 拉回节流配合） */
+        private const val DECLARATION_ESCAPE_CHECK_MS = 3_000L
         /** 无障碍/电池提醒复检（固定 ID，不叠新通知） */
         private const val ACCESSIBILITY_WATCH_MS = 5 * 60_000L
         private const val QUEEN_MESSAGE_MIN_MS = 3 * 60_000L

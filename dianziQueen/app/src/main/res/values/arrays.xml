@@ -3,7 +3,7 @@
     <string-array name="domestic_rom_guide_pick_items">
         <item>悬浮窗 / 显示在其他应用上方</item>
         <item>自启动管理</item>
-        <item>电池优化 / 后台高耗电</item>
+        <item>省电策略 / 无限制（小米）</item>
         <item>厂商权限中心（华米OV）</item>
         <item>应用详情</item>
     </string-array>

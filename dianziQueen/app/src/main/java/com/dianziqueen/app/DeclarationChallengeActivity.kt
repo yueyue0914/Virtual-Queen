@@ -1,8 +1,6 @@
 package com.dianziqueen.app
 
 import android.content.Intent
-import android.graphics.Color
-import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -10,19 +8,16 @@ import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.view.WindowManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 
 /**
- * 全屏宣言验证：须输入正确宣言才能继续使用手机；Home/返回/切 App 会立即被拉回。
+ * 宣言验证：须输入正确宣言才能继续使用；Home/返回/切 App 会立即被拉回。
+ * 拦截开关由 [DeclarationInterceptor] 统一管理，通过后立即关闭。
  */
 class DeclarationChallengeActivity : AppCompatActivity() {
 
@@ -41,12 +36,8 @@ class DeclarationChallengeActivity : AppCompatActivity() {
 
     private val relaunchRunnable = Runnable {
         if (isFinishingOrClosed()) return@Runnable
-        if (!DeclarationEnforcement.shouldReassertBlocking(applicationContext)) return@Runnable
+        if (!DeclarationInterceptor.shouldReassertBlocking(applicationContext)) return@Runnable
         DeclarationEnforcement.bringToFront(applicationContext)
-    }
-
-    private val finishRunnable = Runnable {
-        closeActivitySafely()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,7 +51,8 @@ class DeclarationChallengeActivity : AppCompatActivity() {
         requiredText = intent.getStringExtra(DeclarationScheduler.EXTRA_REQUIRED_DECLARATION)
             ?: DeclarationScheduler.currentDeclarationText(this)
         setContentView(R.layout.activity_declaration_challenge)
-        applyBlockingWindow()
+
+        DeclarationInterceptor.startChallenge()
 
         onBackPressedDispatcher.addCallback(this, backPressedCallback)
         bindUi()
@@ -87,39 +79,40 @@ class DeclarationChallengeActivity : AppCompatActivity() {
             return
         }
         DeclarationEnforcement.challengeInForeground = true
-        DeclarationHardBlockHelper.enter(this)
         if (!DeclarationScheduler.shouldBlockUsage(this) &&
             !DeclarationScheduler.isDue(this)
         ) {
             DeclarationEnforcement.challengeInForeground = false
-            DeclarationHardBlockHelper.exit(this)
+            DeclarationInterceptor.reset()
             finish()
         }
     }
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        reassertBlockingImmediate()
+        if (DeclarationInterceptor.shouldReassertBlocking(this)) {
+            reassertBlockingImmediate()
+        }
     }
 
     override fun onPause() {
         super.onPause()
-        DeclarationEnforcement.challengeInForeground = false
-        reassertBlockingImmediate()
+        // 不在 onPause 拉回：输入法/通知栏等会误触发，且会把 challengeInForeground  prematurely 置 false
     }
 
     override fun onStop() {
         super.onStop()
         DeclarationEnforcement.challengeInForeground = false
-        reassertBlockingImmediate()
+        if (DeclarationInterceptor.shouldReassertBlocking(this)) {
+            reassertBlockingImmediate()
+        } else {
+            handler.removeCallbacksAndMessages(null)
+        }
     }
 
     override fun onDestroy() {
         DeclarationEnforcement.challengeInForeground = false
         handler.removeCallbacksAndMessages(null)
-        if (!isFinishingOrClosed()) {
-            DeclarationHardBlockHelper.exit(this)
-        }
         super.onDestroy()
     }
 
@@ -145,19 +138,47 @@ class DeclarationChallengeActivity : AppCompatActivity() {
 
     private fun onDeclarationSuccess() {
         if (isFinishingOrClosed()) return
-        closing = true
+
+        DeclarationInterceptor.finishChallengeSuccess()
         passed = true
+        closing = true
+        handler.removeCallbacksAndMessages(null)
+
         backPressedCallback.isEnabled = false
         submitButton.isEnabled = false
         declarationInput.isEnabled = false
-        handler.removeCallbacksAndMessages(null)
+
         DeclarationScheduler.markChallengePassed(this)
-        DeclarationHardBlockHelper.exit(this)
-        Toast.makeText(this, R.string.declaration_challenge_ok, Toast.LENGTH_SHORT).show()
-        handler.postDelayed(finishRunnable, FINISH_DELAY_MS)
+        Toast.makeText(
+            this,
+            getString(
+                R.string.declaration_challenge_ok_fmt,
+                QueenPointsStore.DECLARATION_PASS_POINTS,
+            ),
+            Toast.LENGTH_SHORT,
+        ).show()
+
+        runOnUiThread {
+            if (isFinishing) return@runOnUiThread
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    finishAndRemoveTask()
+                } else {
+                    @Suppress("DEPRECATION")
+                    finish()
+                }
+                @Suppress("DEPRECATION")
+                overridePendingTransition(0, 0)
+            } catch (_: Exception) {
+                finish()
+                @Suppress("DEPRECATION")
+                overridePendingTransition(0, 0)
+            }
+        }
     }
 
-    /** 在主线程延迟关闭，避免部分机型 finish 与 onPause/拉回竞态。 */
+    private fun isFinishingOrClosed(): Boolean = passed || closing || isFinishing
+
     private fun closeActivitySafely() {
         if (isFinishing) return
         runOnUiThread {
@@ -169,54 +190,35 @@ class DeclarationChallengeActivity : AppCompatActivity() {
                     @Suppress("DEPRECATION")
                     finish()
                 }
+                @Suppress("DEPRECATION")
+                overridePendingTransition(0, 0)
             } catch (_: Exception) {
                 finish()
+                @Suppress("DEPRECATION")
+                overridePendingTransition(0, 0)
             }
         }
     }
 
-    private fun isFinishingOrClosed(): Boolean = passed || closing || isFinishing
-
     private fun reassertBlockingImmediate() {
         if (isFinishingOrClosed()) return
-        if (!DeclarationEnforcement.shouldReassertBlocking(applicationContext)) return
+        if (!DeclarationInterceptor.shouldReassertBlocking(this)) return
         handler.removeCallbacks(relaunchRunnable)
-        handler.post {
+        handler.postDelayed({
             if (!isFinishingOrClosed() &&
-                DeclarationEnforcement.shouldReassertBlocking(applicationContext)
+                DeclarationInterceptor.shouldReassertBlocking(applicationContext)
             ) {
                 DeclarationEnforcement.bringToFront(applicationContext)
             }
-        }
-        handler.postDelayed(relaunchRunnable, DeclarationEnforcement.REASSERT_DELAY_MS)
+        }, DeclarationEnforcement.REASSERT_DELAY_MS)
     }
 
     private fun punishEscapeAttempt() {
         if (isFinishingOrClosed()) return
+        if (!DeclarationInterceptor.shouldReassertBlocking(this)) return
         vibratePunish()
         Toast.makeText(this, R.string.declaration_challenge_escape_denied, Toast.LENGTH_SHORT).show()
         reassertBlockingImmediate()
-    }
-
-    private fun applyBlockingWindow() {
-        window.setFormat(PixelFormat.OPAQUE)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.addFlags(
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
-        )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-        }
-        window.statusBarColor = Color.TRANSPARENT
-        window.navigationBarColor = Color.BLACK
-        WindowInsetsControllerCompat(window, window.decorView).apply {
-            hide(WindowInsetsCompat.Type.statusBars())
-            systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
     }
 
     private fun vibratePunish() {
@@ -235,9 +237,5 @@ class DeclarationChallengeActivity : AppCompatActivity() {
             @Suppress("DEPRECATION")
             vibrator.vibrate(longArrayOf(0, 180, 80, 220), -1)
         }
-    }
-
-    companion object {
-        private const val FINISH_DELAY_MS = 300L
     }
 }

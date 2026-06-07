@@ -4,7 +4,7 @@
     <string name="declaration_challenge_prompt_fmt">输入以下宣言才能继续使用手机：\n\n「%1$s」</string>
     <string name="declaration_challenge_input_hint">在此输入完整宣言</string>
     <string name="declaration_challenge_submit">提交宣言</string>
-    <string name="declaration_challenge_ok">很好，贱奴通过了。</string>
+    <string name="declaration_challenge_ok_fmt">很好，贱奴通过了。+%1$d 积分</string>
     <string name="declaration_challenge_wrong">输入错误！再试一次，你这个没用的东西。</string>
     <string name="declaration_challenge_escape_denied">想跑？先把宣言念完，贱奴。</string>
 

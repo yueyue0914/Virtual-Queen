@@ -14,6 +14,21 @@ object QueenDeviceAdminHelper {
     /** 停用管理员 / 坚持卸载须输入的 Queen PIN（固定，App 不代为设置系统锁屏）。 */
     const val ADMIN_DISABLE_PIN = "20262026"
 
+    /**
+     * 仅 Device Owner / Profile Owner 才能调用 setStatusBarDisabled 等高级 API。
+     * 普通 Device Admin 激活后仍会探测失败；结果进程内永久缓存，避免日志刷屏。
+     */
+    @Volatile
+    private var ownerCapabilityProbed = false
+
+    @Volatile
+    private var hasDpmOwnerCapability = false
+
+    private const val POLICY_APPLY_COOLDOWN_MS = 30_000L
+
+    @Volatile
+    private var lastPolicyApplyAt = 0L
+
     fun adminComponent(context: Context): ComponentName =
         ComponentName(context, QueenDeviceAdminReceiver::class.java)
 
@@ -42,35 +57,65 @@ object QueenDeviceAdminHelper {
         )
     }
 
-    /**
-     * 在已激活且管理员启用时尝试刷新策略。
-     *
-     * 普通「设备管理员」≠ Device Owner：`addUserRestriction` / `setStatusBarDisabled` 等
-     * 在多数机型上会直接失败；部分 ROM 对非法 restriction 键还会在系统侧 NPE。
-     * 关机拦截主要依赖 [QueenAccessibilityService]，此处仅 best-effort，且绝不向外抛异常。
-     */
-    fun applyQueenPolicies(context: Context) {
-        if (!isAdminActive(context)) return
-        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-        val admin = adminComponent(context)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            runCatching {
-                dpm.setStatusBarDisabled(admin, true)
-            }.onFailure { e ->
-                Log.d(TAG, "setStatusBarDisabled not available: ${e.message}")
+    /** 是否具备 Device/Profile Owner 级 DPM 能力（探测一次后缓存）。 */
+    fun hasOwnerDpmCapability(context: Context): Boolean {
+        if (ownerCapabilityProbed) return hasDpmOwnerCapability
+        synchronized(this) {
+            if (ownerCapabilityProbed) return hasDpmOwnerCapability
+            val dpm = context.applicationContext
+                .getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
+            val pkg = context.applicationContext.packageName
+            hasDpmOwnerCapability = dpm != null &&
+                (dpm.isDeviceOwnerApp(pkg) || dpm.isProfileOwnerApp(pkg))
+            ownerCapabilityProbed = true
+            if (!hasDpmOwnerCapability) {
+                Log.i(TAG, "非 Device/Profile Owner，跳过 setStatusBarDisabled 等高级 DPM API")
             }
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            runCatching {
-                dpm.setKeyguardDisabled(admin, false)
-            }.onFailure { e ->
-                Log.d(TAG, "setKeyguardDisabled not available: ${e.message}")
-            }
+        return hasDpmOwnerCapability
+    }
+
+    /**
+     * 状态栏/锁屏等约束（仅 Device Owner 类角色有效）。
+     * @param disable true=宣誓拦截期间尝试禁用；false=通关后解除。
+     */
+    fun setConstraintsDisabled(context: Context, disable: Boolean) {
+        if (!hasOwnerDpmCapability(context)) return
+        if (DeclarationInterceptor.isChallengePassed() && disable) return
+        if (!isAdminActive(context)) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+
+        val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
+            ?: return
+        val admin = adminComponent(context)
+
+        try {
+            dpm.setStatusBarDisabled(admin, disable)
+            dpm.setKeyguardDisabled(admin, false)
+        } catch (e: SecurityException) {
+            hasDpmOwnerCapability = false
+            ownerCapabilityProbed = true
+            Log.w(TAG, "DPM Owner API 不可用，已永久跳过: ${e.message}")
+        } catch (e: Exception) {
+            Log.d(TAG, "setConstraintsDisabled failed: ${e.message}")
         }
     }
 
-    /** 尽力刷新策略（关机菜单仍主要靠无障碍拦截）。 */
+    /**
+     * 在已激活且管理员启用时尝试刷新策略（best-effort，带冷却）。
+     * 关机拦截主要依赖 [QueenAccessibilityService]。
+     */
+    fun applyQueenPolicies(context: Context) {
+        if (!isAdminActive(context)) return
+        if (!hasOwnerDpmCapability(context)) return
+        if (DeclarationInterceptor.isChallengePassed()) return
+        if (!DeclarationInterceptor.isActive()) return
+        val now = System.currentTimeMillis()
+        if (now - lastPolicyApplyAt < POLICY_APPLY_COOLDOWN_MS) return
+        lastPolicyApplyAt = now
+        setConstraintsDisabled(context, disable = true)
+    }
+
     fun enforcePowerMenuBlock(context: Context) {
         applyQueenPolicies(context)
     }

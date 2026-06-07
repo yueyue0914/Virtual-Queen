@@ -52,7 +52,8 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.DianziQueen"
         android:usesCleartextTraffic="false"
-        tools:remove="android:appComponentFactory">
+        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+        tools:replace="android:appComponentFactory">
 
         <activity
             android:name=".MainActivity"
@@ -132,6 +133,17 @@
             android:turnScreenOn="true" />
 
         <activity
+            android:name=".DeviceAdminPinGateActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:screenOrientation="portrait"
+            android:showWhenLocked="true"
+            android:theme="@style/Theme.DianziQueen"
+            android:turnScreenOn="true"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".KeepAlivePixelActivity"
             android:exported="false"
             android:excludeFromRecents="true"
@@ -149,6 +161,7 @@
                 android:resource="@xml/queen_device_admin" />
             <intent-filter>
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+                <action android:name="android.app.action.DEVICE_ADMIN_DISABLED" />
                 <action android:name="android.app.action.DEVICE_ADMIN_DISABLE_REQUESTED" />
             </intent-filter>
         </receiver>
@@ -182,17 +195,6 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="User-enabled persistent companion / wallpaper sync mode for DianziQueen." />
-        </service>
-
-        <service
-            android:name=".QueenRemoteService"
-            android:enabled="true"
-            android:exported="false"
-            android:process=":keepalive"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Dual-process keep-alive companion for DianziQueen." />
         </service>
 
         <receiver

@@ -52,7 +52,6 @@ object QueenReleaseManager {
         QueenFloatingWindow.hide()
         QueenService.stop(context)
         QueenKeepAlive.cancelWatchdog(context)
-        QueenKeepAlive.stopRemoteDaemon(context)
         KeepAlivePixelActivity.dismiss()
         QueenNotificationListenerHelper.cancelDisconnectedNotification(context)
         UninstallGuard.disableProtection(context)

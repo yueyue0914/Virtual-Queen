@@ -33,6 +33,7 @@ class MainActivity : AppCompatActivity() {
         const val EXTRA_OPEN_BATTERY_SETTINGS = "open_battery_settings"
         const val EXTRA_OPEN_MESSAGES = "open_messages"
         const val EXTRA_OPEN_ALBUM = "open_album"
+        private const val KEEP_ALIVE_ENSURE_COOLDOWN_MS = 30_000L
     }
 
     /** 激活口令，支持中文。 */
@@ -175,6 +176,10 @@ class MainActivity : AppCompatActivity() {
 
     /** 代码里同步底部选中项时，避免再次触发 [activatedBottomNav] 监听造成递归崩溃。 */
     private var suppressBottomNavCallback = false
+
+    private var dailyBonusResetRunnable: Runnable? = null
+
+    private var lastKeepAliveEnsureAt = 0L
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -419,9 +424,12 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    override fun onStart() {
-        super.onStart()
-        schedulePrivilegeAuditOnAppOpen()
+    private fun ensureKeepAliveIfNeeded() {
+        val now = System.currentTimeMillis()
+        if (now - lastKeepAliveEnsureAt < KEEP_ALIVE_ENSURE_COOLDOWN_MS) return
+        lastKeepAliveEnsureAt = now
+        ensureServiceRunning()
+        QueenKeepAlive.ensureRunning(this, notifyIfRestored = false)
     }
 
     override fun onResume() {
@@ -446,30 +454,20 @@ class MainActivity : AppCompatActivity() {
         refreshCodeRainPhrases()
         updatePrivilegeUi()
         if (prefs.getBoolean(Prefs.ACTIVATED, false)) {
-            ensureServiceRunning()
-            QueenKeepAlive.ensureRunning(this, notifyIfRestored = false)
+            ensureKeepAliveIfNeeded()
             UninstallGuard.checkRebellionOnReinstall(this)
             if (!passDailySelfieGate()) return
             if (activatedPanel.visibility != View.VISIBLE) {
                 showActivatedState()
             }
             if (QueenPointsStore.grantDailyOpenBonusIfNeeded(this)) {
-                Toast.makeText(
-                    this,
-                    getString(
-                        R.string.points_daily_bonus_toast,
-                        QueenPointsStore.DAILY_OPEN_BONUS_POINTS,
-                    ),
-                    Toast.LENGTH_SHORT,
-                ).show()
+                handler.post { showDailyOpenBonusFeedback() }
+            } else if (currentActivatedTab == ActivatedTab.PROFILE) {
                 refreshProfilePanel()
             }
             ensureCalendarInjected()
             QueenDeviceAdminHelper.applyQueenPolicies(this)
             tryApplyQueenDeviceName()
-            if (currentActivatedTab == ActivatedTab.PROFILE) {
-                refreshProfilePanel()
-            }
             refreshMessagesUnreadBadge()
             schedulePrivilegeAuditOnAppOpen()
             if (DomesticRomGuide.needsGuide(this)) {
@@ -803,6 +801,25 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** 每日签到积分：应用内提示，避免 MIUI 等对 Toast.show 打印 callstack 日志。 */
+    private fun showDailyOpenBonusFeedback() {
+        if (isFinishing || !::profilePointsText.isInitialized) return
+        val points = prefs.getInt(Prefs.QUEEN_POINTS, 0)
+        val bonus = QueenPointsStore.DAILY_OPEN_BONUS_POINTS
+        profilePointsText.text = getString(R.string.profile_points_daily_bonus_fmt, points, bonus)
+        dailyBonusResetRunnable?.let { handler.removeCallbacks(it) }
+        val reset = Runnable {
+            if (!isFinishing && ::profilePointsText.isInitialized) {
+                profilePointsText.text = getString(
+                    R.string.profile_points_fmt,
+                    prefs.getInt(Prefs.QUEEN_POINTS, 0),
+                )
+            }
+        }
+        dailyBonusResetRunnable = reset
+        handler.postDelayed(reset, 3_000L)
+    }
+
     /** 未激活：进入时按顺序引导补齐权限。 */
     private fun maybeRequestEarlyPrivileges() {
         if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
@@ -1123,12 +1140,10 @@ class MainActivity : AppCompatActivity() {
         QueenService.start(this)
         QueenKeepAlive.onActivated(this)
         QueenDeviceAdminHelper.applyQueenPolicies(this)
-        DeclarationHardBlockHelper.ensureLockTaskAllowlist(this)
         ensureCalendarInjected()
         tryApplyQueenDeviceName()
         updatePrivilegeUi()
         DomesticRomGuide.showGuideIfNeeded(this)
-        UninstallGuard.enableProtection(this)
         SettingsLockGuard.ensureStrongControlOnActivation(this)
         DeclarationScheduler.ensureScheduleInitialized(this)
     }

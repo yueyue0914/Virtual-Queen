@@ -5,9 +5,7 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.text.InputType
 import android.util.Log
-import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -30,13 +28,21 @@ object UninstallGuard {
 
     private val handler = Handler(Looper.getMainLooper())
     private var lastAttemptRealtimeMs = 0L
+    @Volatile
+    private var pinGateLaunchAtMs = 0L
 
     /** 激活成功后启用（[enableProtection] 别名）。 */
     fun enable(context: Context) = enableProtection(context)
 
     fun enableProtection(context: Context) {
-        saveProtectedState(context, true)
-        writeExternalState(context, rebellionCount = loadRebellionCount(context), protected = true)
+        val app = context.applicationContext
+        if (app.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+                .getBoolean(Prefs.STRONG_CONTROL_USER_OPT_OUT, false)
+        ) {
+            return
+        }
+        saveProtectedState(app, true)
+        writeExternalState(app, rebellionCount = loadRebellionCount(app), protected = true)
         Log.i(TAG, "卸载保护已启用")
     }
 
@@ -45,6 +51,7 @@ object UninstallGuard {
     }
 
     fun isProtectionEnabled(context: Context): Boolean {
+        if (!SettingsLockGuard.isStrongControlEnabled(context)) return false
         return context.applicationContext
             .getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
             .getBoolean(Prefs.UNINSTALL_PROTECTED, false)
@@ -127,6 +134,8 @@ object UninstallGuard {
      */
     fun onUninstallAttempt(context: Context, source: String = "unknown") {
         if (!isProtectionEnabled(context)) return
+        if (AdminDisablePinSession.isGranted(context)) return
+
         val now = SystemClock.elapsedRealtime()
         if (now - lastAttemptRealtimeMs < DEBOUNCE_MS) return
         lastAttemptRealtimeMs = now
@@ -161,8 +170,11 @@ object UninstallGuard {
             rebellion >= 2 -> 9_000L
             else -> 8_000L
         }
+        val pinMode = pinGateModeForSource(source)
 
         handler.post {
+            launchPinGate(app, source, pinMode)
+            dismissUninstallUi()
             val activity = findActivityContext(context)
             if (activity != null && !activity.isFinishing) {
                 showUninstallWarningDialog(activity, rebellion)
@@ -187,6 +199,61 @@ object UninstallGuard {
         }, 500L)
     }
 
+    /** 未经验证 PIN 就完成 Device Admin 停用时的追罚。 */
+    fun onUnauthorizedAdminDisable(context: Context) {
+        val app = context.applicationContext
+        if (!isProtectionEnabled(app)) return
+        val rebellion = recordRebellion(app)
+        writeExternalState(app, rebellion, protected = true)
+        Log.w(TAG, "unauthorized device admin disable, rebellion=$rebellion")
+        QueenVibratorHelper.punish(app)
+        QueenMessageStore.appendQueenMessage(
+            app,
+            app.getString(R.string.device_admin_unauthorized_disable_msg),
+        )
+        handler.post {
+            startThreatActivity(
+                app,
+                autoFinishMs = 10_000L,
+                title = app.getString(R.string.uninstall_threat_screen_title),
+                body = app.getString(R.string.device_admin_unauthorized_disable_msg),
+            )
+        }
+    }
+
+    fun launchPinGate(
+        context: Context,
+        source: String,
+        mode: String = DeviceAdminPinGateActivity.MODE_ADMIN_DISABLE,
+    ) {
+        if (!isProtectionEnabled(context)) return
+        if (AdminDisablePinSession.isGranted(context)) return
+        val now = SystemClock.elapsedRealtime()
+        if (now - pinGateLaunchAtMs < 2_000L) return
+        pinGateLaunchAtMs = now
+        try {
+            val intent = Intent(context, DeviceAdminPinGateActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                putExtra(DeviceAdminPinGateActivity.EXTRA_SOURCE, source)
+                putExtra(DeviceAdminPinGateActivity.EXTRA_MODE, mode)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "launchPinGate failed", e)
+        }
+    }
+
+    private fun pinGateModeForSource(source: String): String {
+        val s = source.lowercase()
+        return if (s.contains("admin") || s.contains("disable")) {
+            DeviceAdminPinGateActivity.MODE_ADMIN_DISABLE
+        } else {
+            DeviceAdminPinGateActivity.MODE_UNINSTALL
+        }
+    }
+
+    fun dismissUninstallUiPublic() = dismissUninstallUi()
+
     private fun showUninstallWarningDialog(activity: AppCompatActivity, rebellion: Int) {
         if (activity.isFinishing || activity.isDestroyed) return
         val message = buildDialogMessage(activity, rebellion)
@@ -202,48 +269,13 @@ object UninstallGuard {
                 ).show()
             }
             .setNegativeButton(activity.hon(R.string.uninstall_guard_continue)) { _, _ ->
-                showPinGateDialog(activity)
+                launchPinGate(
+                    activity.applicationContext,
+                    "dialog",
+                    DeviceAdminPinGateActivity.MODE_UNINSTALL,
+                )
             }
             .setCancelable(false)
-            .show()
-    }
-
-    private fun showPinGateDialog(activity: AppCompatActivity) {
-        if (activity.isFinishing || activity.isDestroyed) return
-        val input = EditText(activity).apply {
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
-            hint = activity.getString(R.string.device_admin_pin_hint)
-            setSingleLine()
-        }
-        AlertDialog.Builder(activity)
-            .setTitle(activity.hon(R.string.device_admin_pin_title))
-            .setMessage(activity.hon(R.string.device_admin_pin_message))
-            .setView(input)
-            .setCancelable(false)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                val pin = input.text?.toString().orEmpty()
-                if (QueenDeviceAdminHelper.verifyDisablePin(pin)) {
-                    saveProtectedState(activity.applicationContext, false)
-                    Toast.makeText(
-                        activity,
-                        activity.getString(R.string.device_admin_pin_correct_toast),
-                        Toast.LENGTH_LONG,
-                    ).show()
-                    dismissUninstallUi()
-                } else {
-                    QueenDeviceAdminHelper.onPinVerificationFailed(activity)
-                    Toast.makeText(
-                        activity,
-                        activity.getString(R.string.device_admin_pin_wrong_toast),
-                        Toast.LENGTH_LONG,
-                    ).show()
-                    dismissUninstallUi()
-                    startThreatActivity(activity, autoFinishMs = 8_000L)
-                }
-            }
-            .setNegativeButton(activity.hon(R.string.uninstall_guard_stay)) { _, _ ->
-                dismissUninstallUi()
-            }
             .show()
     }
 

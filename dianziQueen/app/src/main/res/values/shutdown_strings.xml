@@ -13,7 +13,12 @@
     <string name="device_admin_disable_requested_message">卸载或停用 Queen 需要输入 PIN 码。\n\n你确定要背叛你的主人吗，贱奴？</string>
     <string name="device_admin_pin_title">输入 Queen PIN</string>
     <string name="device_admin_pin_message">停用管理员或坚持卸载须输入 PIN。输错只会让你更惨。</string>
+    <string name="device_admin_pin_message_admin">要在系统里停用 Device Admin，先在这里输入 Queen PIN。验证通过后 2 分钟内可去设置完成停用。</string>
+    <string name="device_admin_pin_message_uninstall">坚持卸载须先输入 Queen PIN。验证通过后保护会暂时解除。</string>
+    <string name="device_admin_pin_submit">提交 PIN</string>
     <string name="device_admin_pin_hint">PIN 码</string>
+    <string name="device_admin_pin_admin_granted_toast">PIN 正确。2 分钟内可去设置停用管理员，过期须重新验证。</string>
+    <string name="device_admin_unauthorized_disable_msg">你竟敢不输入 PIN 就停用管理员？Queen 已记下一笔反抗，立刻回 App 重新激活设备管理员。</string>
     <string name="device_admin_pin_failed_msg">PIN 输入错误！你这个不听话的贱货……</string>
     <string name="device_admin_pin_wrong_toast">PIN 错误。Queen 不准你跑。</string>
     <string name="device_admin_pin_correct_toast">PIN 正确。管理员保护已暂时解除，别得意太早。</string>

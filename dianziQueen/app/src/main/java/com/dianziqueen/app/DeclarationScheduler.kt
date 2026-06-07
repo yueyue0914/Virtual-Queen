@@ -94,6 +94,7 @@ object DeclarationScheduler {
     fun markChallengePassed(context: Context) {
         DeclarationEnforcement.notifyChallengePassed()
         pendingInMemory = false
+        QueenPointsStore.addPoints(context, QueenPointsStore.DECLARATION_PASS_POINTS)
         val now = System.currentTimeMillis()
         prefs(context).edit()
             .putLong(Prefs.DECLARATION_LAST_PASSED_AT, now)
@@ -160,6 +161,7 @@ object DeclarationScheduler {
 
     fun clearOnRelease(context: Context) {
         pendingInMemory = false
+        DeclarationInterceptor.reset()
         prefs(context).edit()
             .remove(Prefs.DECLARATION_NEXT_AT)
             .remove(Prefs.DECLARATION_LAST_PASSED_AT)

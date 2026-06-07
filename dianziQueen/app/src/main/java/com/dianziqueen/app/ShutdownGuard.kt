@@ -18,6 +18,7 @@ object ShutdownGuard {
         val app = context.applicationContext
         val prefs = app.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
         if (!prefs.getBoolean(Prefs.ACTIVATED, false)) return
+        if (!SettingsLockGuard.isStrongControlEnabled(app)) return
 
         val now = System.currentTimeMillis()
         if (now - lastTriggerAt < COOLDOWN_MS) return

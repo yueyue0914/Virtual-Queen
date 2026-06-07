@@ -15,6 +15,14 @@ import android.view.WindowManager
 class DianziQueenApp : Application() {
 
     private var visibleActivityCount = 0
+    private var lastBackgroundKeepAliveAt = 0L
+
+    companion object {
+        const val CHANNEL_SERVICE = "queen_service_high_v1"
+        /** 与旧版 `queen_teasing_channel` 区分，避免系统沿用用户/旧版的「静默」渠道设置 */
+        const val CHANNEL_TEASING = "queen_teasing_heads_up_v1"
+        private const val BACKGROUND_KEEP_ALIVE_COOLDOWN_MS = 60_000L
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -54,14 +62,21 @@ class DianziQueenApp : Application() {
             override fun onActivityPaused(activity: Activity) = Unit
             override fun onActivityStopped(activity: Activity) {
                 visibleActivityCount = (visibleActivityCount - 1).coerceAtLeast(0)
-                if (visibleActivityCount > 0) return
                 if (activity is KeepAlivePixelActivity) return
+                if (visibleActivityCount > 0) return
                 if (activity.applicationContext
                         .getSharedPreferences(Prefs.NAME, MODE_PRIVATE)
                         .getBoolean(Prefs.ACTIVATED, false)
                 ) {
-                    QueenKeepAlive.ensureRunning(activity.applicationContext, notifyIfRestored = false)
-                    KeepAlivePixelActivity.showIfNeeded(activity.applicationContext)
+                    val now = System.currentTimeMillis()
+                    if (now - lastBackgroundKeepAliveAt >= BACKGROUND_KEEP_ALIVE_COOLDOWN_MS) {
+                        lastBackgroundKeepAliveAt = now
+                        QueenKeepAlive.ensureRunning(
+                            activity.applicationContext,
+                            notifyIfRestored = false,
+                        )
+                        KeepAlivePixelActivity.showIfNeeded(activity.applicationContext)
+                    }
                 }
             }
             override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
@@ -70,6 +85,7 @@ class DianziQueenApp : Application() {
     }
 
     private fun applySecureWindow(activity: Activity) {
+        if (activity is KeepAlivePixelActivity) return
         activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
     }
 
@@ -109,24 +125,5 @@ class DianziQueenApp : Application() {
 
         nm.createNotificationChannel(serviceCh)
         nm.createNotificationChannel(teasingCh)
-
-        val daemonCh = NotificationChannel(
-            CHANNEL_DAEMON,
-            getString(R.string.daemon_channel_name),
-            NotificationManager.IMPORTANCE_MIN,
-        ).apply {
-            description = getString(R.string.daemon_channel_desc)
-            setShowBadge(false)
-            lockscreenVisibility = Notification.VISIBILITY_SECRET
-        }
-        nm.createNotificationChannel(daemonCh)
-    }
-
-    companion object {
-        const val CHANNEL_SERVICE = "queen_service_high_v1"
-        /** 与旧版 `queen_teasing_channel` 区分，避免系统沿用用户/旧版的「静默」渠道设置 */
-        const val CHANNEL_TEASING = "queen_teasing_heads_up_v1"
-        /** [:keepalive] 守护进程低干扰通知渠道 */
-        const val CHANNEL_DAEMON = "queen_daemon_min_v1"
     }
 }

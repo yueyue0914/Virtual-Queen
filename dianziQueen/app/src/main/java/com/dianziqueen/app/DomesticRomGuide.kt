@@ -186,7 +186,11 @@ object DomesticRomGuide {
             R.string.domestic_rom_guide_go
         isDomesticRom() &&
             !QueenBatteryHelper.isExemptFromBatteryOptimizations(activity) ->
-            R.string.domestic_rom_guide_go_battery
+            if (detectRom() == RomVendor.XIAOMI) {
+                R.string.domestic_rom_guide_go_xiaomi_power
+            } else {
+                R.string.domestic_rom_guide_go_battery
+            }
         else -> R.string.domestic_rom_guide_go_rom
     }
 
@@ -210,12 +214,24 @@ object DomesticRomGuide {
         }
         if (isDomesticRom()) {
             if (!QueenBatteryHelper.isExemptFromBatteryOptimizations(context)) {
-                lines.add(context.getString(R.string.domestic_rom_status_battery))
+                lines.add(
+                    if (detectRom() == RomVendor.XIAOMI) {
+                        context.getString(R.string.domestic_rom_status_xiaomi_power)
+                    } else {
+                        context.getString(R.string.domestic_rom_status_battery)
+                    },
+                )
             }
             if (!RomPermissionProbe.isWriteSettingsAutoDetected(context)) {
                 lines.add(context.getString(R.string.domestic_rom_status_write_settings))
             }
-            lines.add(context.getString(R.string.domestic_rom_status_autostart_hint))
+            lines.add(
+                if (detectRom() == RomVendor.XIAOMI) {
+                    context.getString(R.string.domestic_rom_status_xiaomi_autostart)
+                } else {
+                    context.getString(R.string.domestic_rom_status_autostart_hint)
+                },
+            )
         }
         return lines
     }

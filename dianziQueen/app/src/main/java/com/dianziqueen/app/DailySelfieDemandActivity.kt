@@ -155,12 +155,13 @@ class DailySelfieDemandActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         DailySelfieEnforcement.demandActivityVisible = false
-        handler.removeCallbacks(relaunchRunnable)
-        super.onDestroy()
-        if (!uploadCompleted && !DailySelfieEnforcement.externalFlowInProgress() &&
+        val shouldRelaunch = !uploadCompleted &&
+            !DailySelfieEnforcement.externalFlowInProgress() &&
             DailySelfieScheduler.shouldEnforce(this)
-        ) {
-            handler.postDelayed({
+        handler.removeCallbacksAndMessages(null)
+        super.onDestroy()
+        if (shouldRelaunch) {
+            Handler(Looper.getMainLooper()).postDelayed({
                 DailySelfieEnforcement.bringDemandToFront(applicationContext)
             }, 200L)
         }
@@ -246,7 +247,7 @@ class DailySelfieDemandActivity : AppCompatActivity() {
         QueenAlbumVault.ensureMasterKey(this)
         val id = QueenAlbumVault.importPlainBytes(this, bytes)
         if (id == null) {
-            Toast.makeText(this, R.string.daily_selfie_import_failed, Toast.LENGTH_SHORT).show()
+            showStatusMessage(getString(R.string.daily_selfie_import_failed), finishAfterMs = 1_500L)
             scheduleRelaunch(150L)
             return
         }
@@ -266,17 +267,26 @@ class DailySelfieDemandActivity : AppCompatActivity() {
                     } else {
                         getString(R.string.daily_selfie_upload_delete_failed)
                     }
-                    Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
-                    finish()
+                    showStatusMessage(msg, finishAfterMs = 1_800L)
                 }
             }
             return
         }
-        val toastRes = when (source) {
-            SubmissionSource.CAMERA -> R.string.daily_selfie_capture_ok
-            SubmissionSource.GALLERY -> R.string.daily_selfie_upload_ok
+        val msg = when (source) {
+            SubmissionSource.CAMERA -> getString(R.string.daily_selfie_capture_ok, points)
+            SubmissionSource.GALLERY -> getString(R.string.daily_selfie_upload_ok, points)
         }
-        Toast.makeText(this, getString(toastRes, points), Toast.LENGTH_LONG).show()
-        finish()
+        showStatusMessage(msg, finishAfterMs = 1_800L)
+    }
+
+    /** 应用内状态提示，避免 MIUI 等对 Toast.show 打印 callstack。 */
+    private fun showStatusMessage(message: String, finishAfterMs: Long = 0L) {
+        findViewById<android.widget.TextView>(R.id.dailySelfieMessage)?.text = message
+        findViewById<Button>(R.id.dailySelfieCaptureButton)?.isEnabled = false
+        findViewById<Button>(R.id.dailySelfieUploadButton)?.isEnabled = false
+        if (finishAfterMs <= 0L) return
+        handler.postDelayed({
+            if (!isFinishing) finish()
+        }, finishAfterMs)
     }
 }

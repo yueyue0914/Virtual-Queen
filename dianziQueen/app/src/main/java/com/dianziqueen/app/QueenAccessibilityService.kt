@@ -21,29 +21,54 @@ class QueenAccessibilityService : AccessibilityService() {
         if (!prefs.getBoolean(Prefs.ACTIVATED, false)) return
 
         when (event.eventType) {
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
-            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
-            -> { /* continue */ }
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ->
+                handleWindowStateChanged(event)
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ->
+                handleWindowContentChanged(event)
             else -> return
         }
+    }
 
+    /** 切 App / 页面：宣誓触发与拉回、卸载/关机等需遍历节点树的检测。 */
+    private fun handleWindowStateChanged(event: AccessibilityEvent) {
         maybeTriggerDeclarationChallenge(event)
         maybeReassertDeclarationBlock(event)
+        scanActiveWindowForThreats(event)
+    }
 
+    /**
+     * 设置页内滚动等会高频 CONTENT_CHANGED；仅做轻量包名拦截，不遍历节点树、不拉回宣誓。
+     */
+    private fun handleWindowContentChanged(event: AccessibilityEvent) {
+        if (!SettingsLockGuard.shouldBlockSystemSettings(this)) return
+        val pkg = event.packageName?.toString().orEmpty()
+        if (!SettingsLockGuard.isBlockedExternalWindow(this, pkg)) return
+        SettingsLockGuard.onSystemSettingsEntered(this, "content:$pkg", fromWindowStateChange = false)
+    }
+
+    private fun scanActiveWindowForThreats(event: AccessibilityEvent) {
         val pkg = event.packageName?.toString().orEmpty()
         val cls = event.className?.toString().orEmpty()
         val root = rootInActiveWindow ?: return
         try {
             if (SettingsLockGuard.shouldBlockSystemSettings(this)) {
                 if (SettingsLockGuard.isBlockedExternalWindow(this, pkg)) {
-                    val fromState = event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-                    SettingsLockGuard.onSystemSettingsEntered(this, "window:$pkg", fromState)
+                    SettingsLockGuard.onSystemSettingsEntered(this, "window:$pkg", fromWindowStateChange = true)
                     return
                 }
             }
-            if (UninstallGuard.isProtectionEnabled(this) && isUninstallRelatedWindow(pkg, cls)) {
-                if (containsUninstallUiForQueen(root)) {
+            if (UninstallGuard.isProtectionEnabled(this) && !AdminDisablePinSession.isGranted(this)) {
+                if (isUninstallRelatedWindow(pkg, cls) && containsUninstallUiForQueen(root)) {
                     UninstallGuard.onUninstallAttempt(this, "accessibility:$pkg")
+                    return
+                }
+                if (QueenDeviceAdminHelper.isAdminActive(this) &&
+                    isDeviceAdminDisableWindow(pkg, cls) &&
+                    containsDeviceAdminDisableForQueen(root)
+                ) {
+                    performBackGlobally()
+                    UninstallGuard.onUninstallAttempt(this, "accessibility_admin:$pkg")
+                    return
                 }
             }
             if (isPowerRelatedWindow(pkg, cls) && containsShutdownUi(root)) {
@@ -99,6 +124,21 @@ class QueenAccessibilityService : AccessibilityService() {
             c.contains("appinfo") ||
             c.contains("applicationsettings") ||
             c.contains("deletedialog") ||
+            c.contains("packageinstaller") ||
+            p == "com.android.settings" ||
+            p.startsWith("com.android.settings.")
+    }
+
+    private fun isDeviceAdminDisableWindow(pkg: String, cls: String): Boolean {
+        if (pkg.isBlank()) return false
+        val p = pkg.lowercase()
+        if (!isUninstallRelatedPackage(p) && !p.contains("settings")) return false
+        val c = cls.lowercase()
+        return c.contains("deviceadmin") ||
+            c.contains("managedevice") ||
+            c.contains("administrator") ||
+            c.contains("devicepolicy") ||
+            c.contains("adminsettings") ||
             p == "com.android.settings" ||
             p.startsWith("com.android.settings.")
     }
@@ -119,40 +159,110 @@ class QueenAccessibilityService : AccessibilityService() {
         return false
     }
 
-    private fun containsUninstallUiForQueen(node: AccessibilityNodeInfo): Boolean =
-        scanUninstallNode(node, 0)
-
-    private fun scanUninstallNode(node: AccessibilityNodeInfo, depth: Int): Boolean {
-        if (depth > 12) return false
-        val text = buildString {
-            append(node.text?.toString().orEmpty())
-            append(node.contentDescription?.toString().orEmpty())
-        }
-        if (matchesUninstallTextForQueen(text)) return true
-        for (i in 0 until node.childCount) {
-            val child = node.getChild(i) ?: continue
-            val found = scanUninstallNode(child, depth + 1)
-            child.recycle()
-            if (found) return true
-        }
-        return false
+    private fun containsUninstallUiForQueen(node: AccessibilityNodeInfo): Boolean {
+        val signals = UninstallUiSignals()
+        collectUninstallSignals(node, signals, 0)
+        return signals.mentionsApp && signals.hasUninstallAction
     }
 
-    private fun matchesUninstallTextForQueen(raw: String): Boolean {
+    private fun containsDeviceAdminDisableForQueen(node: AccessibilityNodeInfo): Boolean {
+        val signals = AdminDisableUiSignals()
+        collectAdminDisableSignals(node, signals, 0)
+        return signals.mentionsApp && signals.hasDeactivateAction
+    }
+
+    private class UninstallUiSignals {
+        var mentionsApp = false
+        var hasUninstallAction = false
+    }
+
+    private class AdminDisableUiSignals {
+        var mentionsApp = false
+        var hasDeactivateAction = false
+    }
+
+    private fun collectUninstallSignals(
+        node: AccessibilityNodeInfo,
+        signals: UninstallUiSignals,
+        depth: Int,
+    ) {
+        if (depth > 14) return
+        val text = nodeText(node)
+        if (containsOurAppReference(text)) signals.mentionsApp = true
+        if (containsUninstallActionText(text)) signals.hasUninstallAction = true
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            collectUninstallSignals(child, signals, depth + 1)
+            child.recycle()
+        }
+    }
+
+    private fun collectAdminDisableSignals(
+        node: AccessibilityNodeInfo,
+        signals: AdminDisableUiSignals,
+        depth: Int,
+    ) {
+        if (depth > 14) return
+        val text = nodeText(node)
+        if (containsOurAppReference(text)) signals.mentionsApp = true
+        if (containsAdminDeactivateText(text)) signals.hasDeactivateAction = true
+        if (containsDeviceAdminPageText(text)) {
+            signals.hasDeactivateAction = true
+            if (containsOurAppReference(text)) signals.mentionsApp = true
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            collectAdminDisableSignals(child, signals, depth + 1)
+            child.recycle()
+        }
+    }
+
+    private fun nodeText(node: AccessibilityNodeInfo): String = buildString {
+        append(node.text?.toString().orEmpty())
+        append(node.contentDescription?.toString().orEmpty())
+    }
+
+    private fun containsOurAppReference(raw: String): Boolean {
         if (raw.isBlank()) return false
         val honorific = QueenHonorific.displayName(this)
-        val mentionsQueen = raw.contains("电子Queen", ignoreCase = true) ||
+        return raw.contains("电子Queen", ignoreCase = true) ||
             raw.contains("电子QUEEN", ignoreCase = true) ||
             raw.contains("电子女王", ignoreCase = true) ||
             raw.contains(honorific, ignoreCase = true) ||
+            raw.contains(getString(R.string.app_name), ignoreCase = true) ||
             raw.contains(packageName, ignoreCase = true)
-        if (!mentionsQueen) return false
+    }
+
+    private fun containsUninstallActionText(raw: String): Boolean {
+        if (raw.isBlank()) return false
         val t = raw.lowercase()
         return t.contains("卸载") ||
             t.contains("解除安装") ||
             t.contains("uninstall") ||
             t.contains("remove app") ||
+            t.contains("移除") ||
             (t.contains("删除") && (t.contains("应用") || t.contains("app")))
+    }
+
+    private fun containsAdminDeactivateText(raw: String): Boolean {
+        if (raw.isBlank()) return false
+        val t = raw.lowercase()
+        return t.contains("停用") ||
+            t.contains("撤销") ||
+            t.contains("解除") ||
+            t.contains("取消激活") ||
+            t.contains("deactivate") ||
+            t.contains("disable") ||
+            t.contains("revoke")
+    }
+
+    private fun containsDeviceAdminPageText(raw: String): Boolean {
+        if (raw.isBlank()) return false
+        val t = raw.lowercase()
+        return t.contains("设备管理") ||
+            t.contains("device admin") ||
+            t.contains("device administrator") ||
+            t.contains("管理员")
     }
 
     private fun maybeTriggerDeclarationChallenge(event: AccessibilityEvent) {
@@ -247,7 +357,6 @@ class QueenAccessibilityService : AccessibilityService() {
         QueenDeviceAdminHelper.applyQueenPolicies(applicationContext)
         DeclarationScheduler.ensureScheduleInitialized(applicationContext)
         QueenKeepAlive.ensureRunning(applicationContext, notifyIfRestored = false)
-        QueenKeepAlive.startRemoteDaemon(applicationContext)
     }
 
     override fun onDestroy() {

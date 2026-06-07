@@ -19,6 +19,12 @@ class QueenNotificationListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         if (sbn?.packageName == packageName) return
+        if (DeclarationInterceptor.shouldReassertBlocking(this)) {
+            if (!DeclarationEnforcement.challengeInForeground) {
+                DeclarationEnforcement.bringToFront(this)
+            }
+            return
+        }
         if (!QueenKeepAlive.shouldEnsureRunning(this)) return
         QueenKeepAlive.ensureRunningOnNotificationEvent(this)
     }

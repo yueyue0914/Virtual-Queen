@@ -12,6 +12,8 @@ object QueenPointsStore {
     const val DAILY_SELFIE_CAPTURE_POINTS = 5
     /** 每日凭证：从相册上传仅奖励 1 积分 */
     const val DAILY_SELFIE_UPLOAD_POINTS = 1
+    /** 每次完成宣言验证奖励 */
+    const val DECLARATION_PASS_POINTS = 2
 
     private val dayKeyFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
