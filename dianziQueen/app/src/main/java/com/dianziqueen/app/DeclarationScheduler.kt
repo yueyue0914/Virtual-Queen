@@ -27,6 +27,8 @@ object DeclarationScheduler {
 
     fun isEnabled(context: Context): Boolean {
         if (!isActivated(context)) return false
+        // 最强控制关闭后不再强制宣誓
+        if (!SettingsLockGuard.isStrongControlEnabled(context)) return false
         return prefs(context).getBoolean(Prefs.DECLARATION_ENABLED, true)
     }
 

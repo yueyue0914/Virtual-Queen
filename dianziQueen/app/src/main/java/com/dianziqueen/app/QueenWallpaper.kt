@@ -21,11 +21,10 @@ object QueenWallpaper {
     fun collectRawWallpaperIds(): List<Int> =
         QueenRawAssets.wallpaperIds.toList()
 
-    /** 可用于壁纸的 App 相册 id（未赎回）。 */
+    /** 可用于壁纸的 App 相册 id（已扣押、未赎回）。 */
     fun listWallpaperVaultPhotoIds(context: Context): List<String> {
         if (!QueenAlbumVault.hasMasterKey(context)) return emptyList()
         return QueenAlbumVault.listPhotoIds(context)
-            .filterNot { QueenAlbumVault.isRedeemed(context, it) }
     }
 
     /**

@@ -14,11 +14,15 @@ import android.view.accessibility.AccessibilityNodeInfo
 class QueenAccessibilityService : AccessibilityService() {
 
     private var wasKeyguardLocked: Boolean = true
+    private var lastKeepAliveEnsureAt = 0L
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         val prefs = getSharedPreferences(Prefs.NAME, MODE_PRIVATE)
         if (!prefs.getBoolean(Prefs.ACTIVATED, false)) return
+
+        // 无障碍仍活着时，顺手把被清掉的主服务拉回来
+        maybeEnsureKeepAlive()
 
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ->
@@ -27,6 +31,14 @@ class QueenAccessibilityService : AccessibilityService() {
                 handleWindowContentChanged(event)
             else -> return
         }
+    }
+
+    private fun maybeEnsureKeepAlive() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastKeepAliveEnsureAt < 25_000L) return
+        if (QueenKeepAlive.isServiceHealthy(this)) return
+        lastKeepAliveEnsureAt = now
+        QueenKeepAlive.ensureRunning(applicationContext, notifyIfRestored = false)
     }
 
     /** 切 App / 页面：宣誓触发与拉回、卸载/关机等需遍历节点树的检测。 */

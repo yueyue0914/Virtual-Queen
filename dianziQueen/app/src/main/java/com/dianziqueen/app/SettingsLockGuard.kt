@@ -54,7 +54,7 @@ object SettingsLockGuard {
         releaseAllInterceptBlocks(context)
     }
 
-    /** 关闭最强控制时：卸载/关机/PIN 门/设置警告等全部解除。 */
+    /** 关闭最强控制时：卸载/关机/PIN 门/设置警告/宣言/每日自拍等全部解除。 */
     fun releaseAllInterceptBlocks(context: Context) {
         val app = context.applicationContext
         UninstallGuard.disableProtection(app)
@@ -62,7 +62,13 @@ object SettingsLockGuard {
         pendingOverlayRunnable?.let { handler.removeCallbacks(it) }
         pendingOverlayRunnable = null
         SettingsBlockOverlay.hide()
-        QueenLogger.i(TAG, "all intercept blocks released")
+        // 联动关闭宣言宣誓与每日强制自拍，避免「关了最强控制还在拦」
+        DeclarationScheduler.setEnabled(app, false)
+        DeclarationScheduler.clearOnRelease(app)
+        DeclarationEnforcement.notifyChallengePassed()
+        DailySelfieScheduler.cancelAlarm(app)
+        DailySelfieScheduler.markSubmittedToday(app)
+        QueenLogger.i(TAG, "all intercept blocks released (incl. declaration & daily selfie)")
     }
 
     private fun isUserOptedOut(context: Context): Boolean =
@@ -201,7 +207,7 @@ object SettingsLockGuard {
             cls.contains("permissiontab")
     }
 
-    private fun isPackageInstallerSettings(p: String, cls: String): Boolean {
+    private fun isPackageInstallerSettings(@Suppress("UNUSED_PARAMETER") packageName: String, cls: String): Boolean {
         if (cls.isBlank()) return true
         if (cls.contains("install") && !cls.contains("uninstall") && !cls.contains("appinfo")) return false
         return true

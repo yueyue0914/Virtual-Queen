@@ -92,8 +92,11 @@ class UninstallThreatActivity : AppCompatActivity() {
     private fun applyFullscreenLock() {
         window.setFormat(PixelFormat.OPAQUE)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.statusBarColor = Color.BLACK
-        window.navigationBarColor = Color.BLACK
+        @Suppress("DEPRECATION")
+        run {
+            window.statusBarColor = Color.BLACK
+            window.navigationBarColor = Color.BLACK
+        }
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         WindowInsetsControllerCompat(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.statusBars())

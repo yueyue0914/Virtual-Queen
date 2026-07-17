@@ -45,16 +45,17 @@ object QueenMenuDialog {
             setupTouchAndKeys(root)
 
             val type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            // 真正模态：不加 NOT_FOCUSABLE / NOT_TOUCH_MODAL / NO_LIMITS，
+            // 否则国产 ROM 上按钮点不中、点空白关不掉。DIM_BEHIND 让背景变暗。
             val params = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT,
                 type,
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                    WindowManager.LayoutParams.FLAG_DIM_BEHIND,
                 PixelFormat.TRANSLUCENT,
             )
+            params.dimAmount = 0.55f
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 params.layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
@@ -105,7 +106,8 @@ object QueenMenuDialog {
 
         scrim.isClickable = true
         scrim.isFocusable = true
-        scrim.setBackgroundColor(0x88000000.toInt())
+        // 变暗由 FLAG_DIM_BEHIND 负责，scrim 透明但仍接管点击以便点空白关闭。
+        scrim.setBackgroundColor(0x00000000)
         scrim.setOnClickListener { dismiss() }
         // 部分机型 OnClickListener 不可靠，用 Touch 兜底。
         scrim.setOnTouchListener { v, event ->

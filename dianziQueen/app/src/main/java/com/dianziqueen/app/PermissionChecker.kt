@@ -69,6 +69,11 @@ object PermissionChecker {
     fun storagePermissionsToRequest(context: Context): Array<String> {
         if (hasStorage(context)) return emptyArray()
         return when {
+            Build.VERSION.SDK_INT >= 34 ->
+                arrayOf(
+                    Manifest.permission.READ_MEDIA_IMAGES,
+                    Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED,
+                )
             Build.VERSION.SDK_INT >= 33 ->
                 arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->

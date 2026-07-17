@@ -417,6 +417,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        DomesticRomGuide.onHostDestroyed(this)
         handler.removeCallbacksAndMessages(null)
         glowAnimator?.cancel()
         if (::albumTabController.isInitialized) {
@@ -488,11 +489,12 @@ class MainActivity : AppCompatActivity() {
             tryApplyQueenDeviceName()
             refreshMessagesUnreadBadge()
             schedulePrivilegeAuditOnAppOpen()
-            if (DomesticRomGuide.needsGuide(this)) {
-                DomesticRomGuide.maybeShowOnResume(this)
-            }
+            QueenFloatingWindow.ensureShown(this)
+            // 只走带冷却的入口，禁止 promptOverlayIfMissing 绕过冷却
+            DomesticRomGuide.maybeShowOnResume(this)
         } else {
             schedulePrivilegeAuditOnAppOpen()
+            DomesticRomGuide.maybeShowOnResume(this)
         }
     }
 
@@ -529,6 +531,8 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (!autoGuide || !canAutoGuidePrivileges()) return
+        // 分步引导独占悬浮窗→自启动/后台→无障碍，期间特权审计不自动跳转
+        if (DomesticRomGuide.shouldDeferPrivilegeAudit(this)) return
         if (prefs.getBoolean(Prefs.ACTIVATED, false)) {
             auditPrivilegesAfterActivation()
         } else {
@@ -861,13 +865,20 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * 按固定顺序检查并引导下一项缺失权限（未激活/已激活共用）。
-     * 日历 → 系统设置 → 电池优化 → 悬浮窗 → 设备管理员 → 无障碍 → 通知 → …
+     * 若 DomesticRomGuide 核心三步未完成，优先走分步引导，不抢日历/写设置等。
+     * 三步完成后：日历 → 系统设置 → 电池 → 设备管理员 → 通知 → …
      *
      * @param force true 时忽略冷却（用户点击「去开启下一项」）
      */
     private fun requestNextMissingPrivilege(force: Boolean = false) {
         if (runtimePermissionDialogOpen) return
         if (!force && !canAutoGuidePrivileges()) return
+        // 悬浮窗→自启动/后台→无障碍 由 DomesticRomGuide 独占
+        if (DomesticRomGuide.shouldDeferPrivilegeAudit(this)) {
+            markAutoPrivilegeGuideLaunched()
+            DomesticRomGuide.showGuideIfNeeded(this)
+            return
+        }
         val audit = QueenPrivilegeAuditor.audit(this)
         for (privilege in audit.missing) {
             when (privilege) {
@@ -884,7 +895,8 @@ class MainActivity : AppCompatActivity() {
                     return
                 }
                 QueenPrivilegeAuditor.Privilege.OVERLAY -> {
-                    requestOverlayPermission()
+                    markAutoPrivilegeGuideLaunched()
+                    DomesticRomGuide.showGuide(this)
                     return
                 }
                 QueenPrivilegeAuditor.Privilege.DEVICE_ADMIN -> {
@@ -892,7 +904,8 @@ class MainActivity : AppCompatActivity() {
                     return
                 }
                 QueenPrivilegeAuditor.Privilege.ACCESSIBILITY -> {
-                    requestAccessibility()
+                    markAutoPrivilegeGuideLaunched()
+                    DomesticRomGuide.showGuide(this)
                     return
                 }
                 QueenPrivilegeAuditor.Privilege.NOTIFICATIONS -> {
@@ -1006,7 +1019,7 @@ class MainActivity : AppCompatActivity() {
     private fun requestOverlayPermission() {
         if (QueenPrivilegeAuditor.canDrawOverlays(this)) return
         markAutoPrivilegeGuideLaunched()
-        DomesticRomGuide.showGuideIfNeeded(this)
+        DomesticRomGuide.showGuide(this)
     }
 
     /** 我的页：Queen 权限自检页。 */
@@ -1190,6 +1203,7 @@ class MainActivity : AppCompatActivity() {
         ensureCalendarInjected()
         tryApplyQueenDeviceName()
         updatePrivilegeUi()
+        QueenFloatingWindow.ensureShown(this)
         DomesticRomGuide.showGuideIfNeeded(this)
         SettingsLockGuard.ensureStrongControlOnActivation(this)
         DeclarationScheduler.ensureScheduleInitialized(this)

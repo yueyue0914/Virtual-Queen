@@ -37,7 +37,6 @@ class DailySelfieDemandActivity : AppCompatActivity() {
     private var uploadCompleted = false
     private var pendingCaptureFile: File? = null
     private var pendingCaptureUri: Uri? = null
-    private val photoDeleteHelper = PhotoDeleteHelper.Helper(this)
 
     private val relaunchRunnable = Runnable {
         if (uploadCompleted || DailySelfieEnforcement.externalFlowInProgress()) return@Runnable
@@ -243,7 +242,13 @@ class DailySelfieDemandActivity : AppCompatActivity() {
         gallerySourceUri: Uri? = null,
     ) {
         QueenAlbumVault.ensureMasterKey(this)
-        val id = QueenAlbumVault.importPlainBytes(this, bytes)
+        val id = if (source == SubmissionSource.GALLERY && gallerySourceUri != null) {
+            PhotoDeleteHelper.takePersistableAccess(this, gallerySourceUri)
+            QueenAlbumVault.seizeInPlace(this, gallerySourceUri)
+                ?: QueenAlbumVault.seizeFromPlainBytes(this, bytes)
+        } else {
+            QueenAlbumVault.seizeFromPlainBytes(this, bytes)
+        }
         if (id == null) {
             showStatusMessage(getString(R.string.daily_selfie_import_failed), finishAfterMs = 1_500L)
             scheduleRelaunch(150L)
@@ -257,19 +262,7 @@ class DailySelfieDemandActivity : AppCompatActivity() {
         uploadCompleted = true
         handler.removeCallbacks(relaunchRunnable)
         DailySelfieScheduler.markSubmittedToday(this)
-        if (source == SubmissionSource.GALLERY && gallerySourceUri != null) {
-            photoDeleteHelper.deleteAfterVaultImport(gallerySourceUri) { deleted ->
-                runOnUiThread {
-                    val msg = if (deleted) {
-                        getString(R.string.daily_selfie_upload_ok, points)
-                    } else {
-                        getString(R.string.daily_selfie_upload_delete_failed)
-                    }
-                    showStatusMessage(msg, finishAfterMs = 1_800L)
-                }
-            }
-            return
-        }
+        // 原地加密后系统相册该位置已是密文，无需再删原图
         val msg = when (source) {
             SubmissionSource.CAMERA -> getString(R.string.daily_selfie_capture_ok, points)
             SubmissionSource.GALLERY -> getString(R.string.daily_selfie_upload_ok, points)

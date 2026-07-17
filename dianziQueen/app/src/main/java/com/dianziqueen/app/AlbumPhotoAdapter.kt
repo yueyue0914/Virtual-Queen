@@ -58,8 +58,7 @@ class AlbumPhotoAdapter(
                 thumb.setImageDrawable(null)
                 thumb.setBackgroundColor(0xFF1A0D0D.toInt())
             }
-            val redeemed = QueenAlbumVault.isRedeemed(itemView.context, photoId)
-            overlay.visibility = if (redeemed) View.GONE else View.VISIBLE
+            overlay.visibility = View.VISIBLE
             thumb.contentDescription = photoId
         }
     }

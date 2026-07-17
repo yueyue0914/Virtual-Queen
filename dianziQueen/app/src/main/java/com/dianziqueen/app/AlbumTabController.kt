@@ -51,7 +51,6 @@ class AlbumTabController(
 
     private var pendingCaptureFile: File? = null
     private var pendingCaptureUri: Uri? = null
-    private val photoDeleteHelper = PhotoDeleteHelper.Helper(activity)
 
     private val pickImageLauncher = activity.registerForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments(),
@@ -60,7 +59,7 @@ class AlbumTabController(
         if (uris.size == 1) {
             val uri = uris.first()
             PhotoDeleteHelper.takePersistableAccess(activity, uri)
-            importFromUri(uri, eraseGallerySource = true)
+            importFromUri(uri)
         } else {
             importFromUris(uris)
         }
@@ -182,7 +181,8 @@ class AlbumTabController(
 
     private fun importFromBytes(bytes: ByteArray) {
         decodeExecutor.execute {
-            val id = QueenAlbumVault.importPlainBytes(activity, bytes)
+            // 相机无系统 Uri：先写入相册再原地加密
+            val id = QueenAlbumVault.seizeFromPlainBytes(activity, bytes)
             activity.runOnUiThread {
                 if (id == null) {
                     Toast.makeText(activity, R.string.album_import_failed, Toast.LENGTH_SHORT).show()
@@ -191,41 +191,32 @@ class AlbumTabController(
                 preloadThumbnail(id)
                 refreshGrid()
                 val points = awardAlbumImportPoints(1)
-                Toast.makeText(activity, withPoints(R.string.album_import_ok, points), Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    activity,
+                    withPoints(R.string.album_import_ok_seized, points),
+                    Toast.LENGTH_LONG,
+                ).show()
             }
         }
     }
 
-    private fun importFromUri(uri: Uri, eraseGallerySource: Boolean) {
+    private fun importFromUri(uri: Uri) {
         PhotoDeleteHelper.takePersistableAccess(activity, uri)
         decodeExecutor.execute {
-            val id = readAndImportUri(uri)
+            val id = QueenAlbumVault.seizeInPlace(activity, uri)
             activity.runOnUiThread {
                 if (id == null) {
-                    Toast.makeText(activity, R.string.album_import_failed, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(activity, R.string.album_import_failed, Toast.LENGTH_LONG).show()
                     return@runOnUiThread
                 }
                 preloadThumbnail(id)
                 refreshGrid()
                 val points = awardAlbumImportPoints(1)
-                if (eraseGallerySource) {
-                    photoDeleteHelper.deleteAfterVaultImport(uri) { deleted ->
-                        activity.runOnUiThread {
-                            val msg = if (deleted) {
-                                R.string.album_import_ok_deleted
-                            } else {
-                                R.string.album_import_delete_failed
-                            }
-                            Toast.makeText(activity, withPoints(msg, points), Toast.LENGTH_LONG).show()
-                        }
-                    }
-                } else {
-                    Toast.makeText(
-                        activity,
-                        withPoints(R.string.album_import_ok, points),
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                }
+                Toast.makeText(
+                    activity,
+                    withPoints(R.string.album_import_ok_seized, points),
+                    Toast.LENGTH_LONG,
+                ).show()
             }
         }
     }
@@ -237,16 +228,14 @@ class AlbumTabController(
         decodeExecutor.execute {
             var ok = 0
             var failed = 0
-            val importedUris = mutableListOf<Uri>()
             val importedIds = mutableListOf<String>()
             for (uri in uris) {
-                val id = readAndImportUri(uri)
+                val id = QueenAlbumVault.seizeInPlace(activity, uri)
                 if (id == null) {
                     failed++
                     continue
                 }
                 importedIds.add(id)
-                importedUris.add(uri)
                 ok++
             }
             activity.runOnUiThread {
@@ -265,9 +254,6 @@ class AlbumTabController(
                     activity.getString(R.string.album_import_batch_partial, ok, failed)
                 }
                 Toast.makeText(activity, "$msg · +$points 积分", Toast.LENGTH_LONG).show()
-                for (uri in importedUris) {
-                    photoDeleteHelper.deleteAfterVaultImport(uri) { }
-                }
             }
         }
     }
@@ -284,37 +270,19 @@ class AlbumTabController(
     private fun withPoints(messageRes: Int, points: Int): String =
         activity.getString(messageRes) + " · +$points 积分"
 
-    private fun readAndImportUri(uri: Uri): String? {
-        val bytes = try {
-            activity.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-        } catch (_: Exception) {
-            null
-        }
-        if (bytes == null || bytes.isEmpty()) return null
-        return QueenAlbumVault.importPlainBytes(activity, bytes)
-    }
-
     private fun loadThumbnail(id: String): Bitmap? {
         val cacheKey = thumbnailCacheKey(id)
         val cached = thumbCache.get(cacheKey)
         if (cached != null) return cached
         val plain = QueenAlbumVault.decryptToBytes(activity, id) ?: return null
         val decoded = AlbumPhotoAdapter.decodeThumbnail(plain) ?: return null
-        val redeemed = QueenAlbumVault.isRedeemed(activity, id)
-        val bmp = if (redeemed) {
-            decoded
-        } else {
-            val blurred = AlbumBlurHelper.blurForAlbumThumbnail(decoded)
-            if (blurred !== decoded) decoded.recycle()
-            blurred
-        }
-        thumbCache.put(cacheKey, bmp)
-        return bmp
+        val blurred = AlbumBlurHelper.blurForAlbumThumbnail(decoded)
+        if (blurred !== decoded) decoded.recycle()
+        thumbCache.put(cacheKey, blurred)
+        return blurred
     }
 
-    private fun thumbnailCacheKey(id: String): String {
-        return if (QueenAlbumVault.isRedeemed(activity, id)) "$id:r" else "$id:l"
-    }
+    private fun thumbnailCacheKey(id: String): String = "$id:locked"
 
     private fun preloadThumbnail(id: String) {
         decodeExecutor.execute {
@@ -351,10 +319,6 @@ class AlbumTabController(
     }
 
     private fun confirmAndViewPhoto(photoId: String) {
-        if (QueenAlbumVault.isRedeemed(activity, photoId)) {
-            openPhotoViewer(photoId)
-            return
-        }
         val points = currentPoints()
         AlertDialog.Builder(activity)
             .setMessage(activity.getString(R.string.album_view_confirm, COST_VIEW, points))
@@ -404,16 +368,14 @@ class AlbumTabController(
 
     private fun showPhotoActionsDialog(photoId: String) {
         val points = currentPoints()
-        val redeemed = QueenAlbumVault.isRedeemed(activity, photoId)
-        val labels = mutableListOf<String>()
-        val actions = mutableListOf<() -> Unit>()
-        if (!redeemed) {
-            labels.add(activity.getString(R.string.album_action_redeem_fmt, COST_REDEEM))
-            actions.add { confirmRedeem(photoId, points) }
-        } else {
-            labels.add(activity.getString(R.string.album_action_delete_fmt, COST_DELETE))
-            actions.add { confirmDelete(photoId, points) }
-        }
+        val labels = mutableListOf(
+            activity.getString(R.string.album_action_redeem_fmt, COST_REDEEM),
+            activity.getString(R.string.album_action_delete_fmt, COST_DELETE),
+        )
+        val actions = mutableListOf<() -> Unit>(
+            { confirmRedeem(photoId, points) },
+            { confirmDelete(photoId, points) },
+        )
         AlertDialog.Builder(activity)
             .setTitle(R.string.album_action_title)
             .setItems(labels.toTypedArray()) { _, which ->
@@ -434,10 +396,6 @@ class AlbumTabController(
     }
 
     private fun confirmDelete(photoId: String, points: Int) {
-        if (!QueenAlbumVault.isRedeemed(activity, photoId)) {
-            Toast.makeText(activity, R.string.album_delete_need_redeem, Toast.LENGTH_LONG).show()
-            return
-        }
         AlertDialog.Builder(activity)
             .setMessage(
                 activity.getString(R.string.album_delete_confirm, COST_DELETE, points),
@@ -448,40 +406,39 @@ class AlbumTabController(
     }
 
     private fun performRedeem(photoId: String) {
-        if (QueenAlbumVault.isRedeemed(activity, photoId)) {
-            Toast.makeText(activity, R.string.album_already_redeemed, Toast.LENGTH_SHORT).show()
-            return
-        }
         if (!spendOrToast(COST_REDEEM)) return
-        if (QueenAlbumVault.redeemPhoto(activity, photoId)) {
-            thumbCache.remove("$photoId:l")
-            thumbCache.remove("$photoId:r")
-            preloadThumbnail(photoId)
-            refreshGrid()
-            Toast.makeText(activity, R.string.album_redeem_ok, Toast.LENGTH_SHORT).show()
-        } else {
-            QueenPointsStore.addPoints(activity, COST_REDEEM)
-            onPointsChanged()
-            Toast.makeText(activity, R.string.album_redeem_failed, Toast.LENGTH_SHORT).show()
+        Toast.makeText(activity, R.string.album_redeem_working, Toast.LENGTH_SHORT).show()
+        decodeExecutor.execute {
+            val ok = QueenAlbumVault.redeemAndRestore(activity, photoId)
+            activity.runOnUiThread {
+                if (ok) {
+                    thumbCache.remove(thumbnailCacheKey(photoId))
+                    refreshGrid()
+                    Toast.makeText(activity, R.string.album_redeem_ok, Toast.LENGTH_LONG).show()
+                } else {
+                    QueenPointsStore.addPoints(activity, COST_REDEEM)
+                    onPointsChanged()
+                    Toast.makeText(activity, R.string.album_redeem_failed, Toast.LENGTH_LONG).show()
+                }
+            }
         }
     }
 
     private fun performDelete(photoId: String) {
-        if (!QueenAlbumVault.isRedeemed(activity, photoId)) {
-            Toast.makeText(activity, R.string.album_delete_need_redeem, Toast.LENGTH_LONG).show()
-            return
-        }
         if (!spendOrToast(COST_DELETE)) return
-        val ok = QueenAlbumVault.deletePhoto(activity, photoId)
-        if (ok) {
-            thumbCache.remove("$photoId:l")
-            thumbCache.remove("$photoId:r")
-            refreshGrid()
-            Toast.makeText(activity, R.string.album_delete_ok, Toast.LENGTH_SHORT).show()
-        } else {
-            QueenPointsStore.addPoints(activity, COST_DELETE)
-            onPointsChanged()
-            Toast.makeText(activity, R.string.album_delete_failed, Toast.LENGTH_SHORT).show()
+        decodeExecutor.execute {
+            val ok = QueenAlbumVault.destroyPhoto(activity, photoId)
+            activity.runOnUiThread {
+                if (ok) {
+                    thumbCache.remove(thumbnailCacheKey(photoId))
+                    refreshGrid()
+                    Toast.makeText(activity, R.string.album_delete_ok, Toast.LENGTH_SHORT).show()
+                } else {
+                    QueenPointsStore.addPoints(activity, COST_DELETE)
+                    onPointsChanged()
+                    Toast.makeText(activity, R.string.album_delete_failed, Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 }

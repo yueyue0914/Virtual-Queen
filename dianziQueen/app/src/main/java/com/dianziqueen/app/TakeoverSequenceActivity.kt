@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -71,8 +72,11 @@ class TakeoverSequenceActivity : AppCompatActivity() {
     private fun applyFullscreenStyle() {
         window.setFormat(PixelFormat.OPAQUE)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.statusBarColor = Color.BLACK
-        window.navigationBarColor = Color.BLACK
+        @Suppress("DEPRECATION")
+        run {
+            window.statusBarColor = Color.BLACK
+            window.navigationBarColor = Color.BLACK
+        }
         WindowInsetsControllerCompat(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.statusBars())
             systemBarsBehavior =
@@ -219,7 +223,8 @@ class TakeoverSequenceActivity : AppCompatActivity() {
             0f,
             Color.argb(glowAlpha, Color.red(color), Color.green(color), Color.blue(color)),
         )
-        binding.progressBar.progressDrawable?.setColorFilter(color, PorterDuff.Mode.SRC_IN)
+        binding.progressBar.progressDrawable?.mutate()?.colorFilter =
+            PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN)
     }
 
     private fun completeTakeover() {

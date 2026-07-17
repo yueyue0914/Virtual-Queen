@@ -11,8 +11,8 @@ android {
         applicationId = "com.dianziqueen.app"
         minSdk = 28
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 114
+        versionName = "1.1.4"
     }
 
     buildTypes {

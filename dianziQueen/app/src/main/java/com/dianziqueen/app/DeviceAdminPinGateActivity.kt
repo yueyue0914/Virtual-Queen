@@ -1,8 +1,8 @@
 package com.dianziqueen.app
 
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
-import android.os.Build
 import android.os.Bundle
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
@@ -17,8 +17,11 @@ import androidx.core.view.WindowInsetsControllerCompat
 
 /**
  * 全屏 PIN 门：系统停用 Device Admin / 卸载流程无法弹 App 内 Dialog 时由此 Activity 承接。
+ * [singleInstance] 下二次唤起走 [onNewIntent]，需刷新 mode 文案。
  */
 class DeviceAdminPinGateActivity : AppCompatActivity() {
+
+    private var currentMode: String = MODE_ADMIN_DISABLE
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,16 +35,30 @@ class DeviceAdminPinGateActivity : AppCompatActivity() {
             },
         )
 
-        val mode = intent.getStringExtra(EXTRA_MODE) ?: MODE_ADMIN_DISABLE
+        bindFromIntent(intent)
+        wireActions()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        bindFromIntent(intent)
+        findViewById<EditText>(R.id.etPinGate).text?.clear()
+    }
+
+    private fun bindFromIntent(intent: Intent?) {
+        currentMode = intent?.getStringExtra(EXTRA_MODE) ?: MODE_ADMIN_DISABLE
         findViewById<TextView>(R.id.tvPinGateTitle).text = hon(R.string.device_admin_pin_title)
-        findViewById<TextView>(R.id.tvPinGateMessage).text = when (mode) {
+        findViewById<TextView>(R.id.tvPinGateMessage).text = when (currentMode) {
             MODE_UNINSTALL -> hon(R.string.device_admin_pin_message_uninstall)
             else -> hon(R.string.device_admin_pin_message_admin)
         }
+    }
 
+    private fun wireActions() {
         val input = findViewById<EditText>(R.id.etPinGate)
         findViewById<Button>(R.id.btnPinGateSubmit).setOnClickListener {
-            verifyPin(input.text?.toString().orEmpty(), mode)
+            verifyPin(input.text?.toString().orEmpty(), currentMode)
         }
         findViewById<Button>(R.id.btnPinGateCancel).apply {
             text = hon(R.string.uninstall_guard_stay)
@@ -49,7 +66,7 @@ class DeviceAdminPinGateActivity : AppCompatActivity() {
         }
         input.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_DONE) {
-                verifyPin(input.text?.toString().orEmpty(), mode)
+                verifyPin(input.text?.toString().orEmpty(), currentMode)
                 true
             } else {
                 false
@@ -96,8 +113,11 @@ class DeviceAdminPinGateActivity : AppCompatActivity() {
         }
         window.attributes.layoutInDisplayCutoutMode =
             android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-        window.statusBarColor = Color.TRANSPARENT
-        window.navigationBarColor = Color.TRANSPARENT
+        @Suppress("DEPRECATION")
+        run {
+            window.statusBarColor = Color.TRANSPARENT
+            window.navigationBarColor = Color.TRANSPARENT
+        }
         @Suppress("DEPRECATION")
         window.setFormat(PixelFormat.OPAQUE)
     }

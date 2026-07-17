@@ -16,7 +16,9 @@
         android:layout_gravity="center_horizontal"
         android:adjustViewBounds="true"
         android:contentDescription="@string/queen_float_avatar_desc"
-        android:importantForAccessibility="yes"
+        android:clickable="false"
+        android:focusable="false"
+        android:importantForAccessibility="no"
         android:scaleType="centerCrop"
         android:src="@drawable/ic_queen_foreground" />
 

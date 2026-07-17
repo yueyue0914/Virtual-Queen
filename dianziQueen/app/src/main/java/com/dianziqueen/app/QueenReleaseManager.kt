@@ -51,6 +51,7 @@ object QueenReleaseManager {
         QueenBatteryHelper.cancelBatteryNotification(context)
         QueenFloatingWindow.hide()
         QueenService.stop(context)
+        QueenRemoteService.stop(context)
         QueenKeepAlive.cancelWatchdog(context)
         KeepAlivePixelActivity.dismiss()
         QueenNotificationListenerHelper.cancelDisconnectedNotification(context)

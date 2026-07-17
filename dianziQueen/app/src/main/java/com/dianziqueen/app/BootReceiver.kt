@@ -7,16 +7,20 @@ import android.content.Intent
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
-        if (action != Intent.ACTION_BOOT_COMPLETED && action != "android.intent.action.QUICKBOOT_POWERON") return
+        if (action != Intent.ACTION_BOOT_COMPLETED &&
+            action != Intent.ACTION_LOCKED_BOOT_COMPLETED &&
+            action != "android.intent.action.QUICKBOOT_POWERON"
+        ) {
+            return
+        }
         val prefs = context.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
         if (!prefs.getBoolean(Prefs.ACTIVATED, false)) return
         val app = context.applicationContext
         UninstallGuard.onBootCompleted(app)
         DailySelfieScheduler.ensureTodaySchedule(app)
         DeclarationScheduler.ensureScheduleInitialized(app)
-        val i = Intent(app, QueenService::class.java)
-        app.startForegroundService(i)
-        QueenKeepAlive.scheduleWatchdog(app)
+        QueenKeepAlive.ensureRunning(app, notifyIfRestored = false)
+        QueenRemoteService.start(app)
     }
 }
 

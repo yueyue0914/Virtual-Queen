@@ -1,29 +1,42 @@
 package com.dianziqueen.app
 
 import android.content.Context
-import android.os.Build
-import android.widget.Toast
+import android.os.Handler
+import android.os.Looper
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import java.lang.ref.WeakReference
 
 /**
- * 华米 OV 等国产 ROM 的 Queen 级权限强引导（悬浮窗 / 自启动 / 后台 / 电池）。
+ * 华米 OV 等国产 ROM 的 Queen 级权限强引导。
  *
- * 比单纯弹「去开悬浮窗」更完整：按 ROM 展示分步说明、检测当前缺失项、
- * 一键跳转厂商权限中心，并支持分项设置（自启动 / 电池等）。
+ * 分步顺序（必须严格遵守）：
+ * 1. 悬浮窗（最重要）
+ * 2. 自启动 + 后台运行
+ * 3. 无障碍服务
  *
- * 相关配合类：
- * - [RomPermissionUtils] — 各品牌设置页精准跳转
- * - [RomPermissionProbe] — AppOps 检测 + 自检页手动确认
- * - [FloatingWindowPermissionHelper] — 悬浮窗检测
- * - [QueenBatteryHelper] — 电池优化豁免
- * - [PermissionCheckActivity] — 完整权限自检页
+ * 与 [MainActivity] 特权审计的关系：
+ * 上述三项由本类独占引导；审计在 [shouldDeferPrivilegeAudit] 为 true 时不得自动跳转。
  */
 object DomesticRomGuide {
 
     private const val PREF_GUIDE_LAST_MS = "queen_domestic_rom_guide_last_ms"
     private const val PREF_GUIDE_PENDING = "queen_domestic_rom_guide_pending"
+    private const val PREF_STEP_PENDING = "queen_domestic_rom_guide_step_pending"
+    /** 常规冷却（已有权限但仍缺自启动等手动项时）。 */
     private const val GUIDE_COOLDOWN_MS = 6 * 60 * 60 * 1000L
+    /** 缺悬浮窗时更频繁提醒（小米极易误关）。 */
+    private const val OVERLAY_MISSING_COOLDOWN_MS = 20 * 60 * 1000L
+    /** 用户从设置页返回后，再弹下一步的延迟。 */
+    private const val NEXT_STEP_DELAY_MS = 1_500L
+
+    private val handler = Handler(Looper.getMainLooper())
+    private var activeDialog: AlertDialog? = null
+    private var pendingActivityRef = WeakReference<AppCompatActivity>(null)
+    private var nextStepRunnable: Runnable? = null
+
+    private val dialogShowing: Boolean
+        get() = activeDialog?.isShowing == true
 
     enum class RomVendor {
         XIAOMI,
@@ -33,56 +46,92 @@ object DomesticRomGuide {
         OTHER,
     }
 
-    fun detectRom(): RomVendor {
-        val brand = Build.BRAND.lowercase()
-        val manufacturer = Build.MANUFACTURER.lowercase()
-        return when {
-            brand.contains("xiaomi") || brand.contains("redmi") || brand.contains("poco") ||
-                manufacturer.contains("xiaomi") || manufacturer.contains("redmi") ->
-                RomVendor.XIAOMI
-            brand.contains("huawei") || brand.contains("honor") ||
-                manufacturer.contains("huawei") ->
-                RomVendor.HUAWEI
-            brand.contains("oppo") || brand.contains("oneplus") || brand.contains("realme") ||
-                manufacturer.contains("oppo") ->
-                RomVendor.OPPO
-            brand.contains("vivo") || brand.contains("iqoo") ||
-                manufacturer.contains("vivo") ->
-                RomVendor.VIVO
-            else -> RomVendor.OTHER
+    private enum class GuideStep(val index: Int) {
+        OVERLAY(1),
+        AUTOSTART_BACKGROUND(2),
+        ACCESSIBILITY(3),
+    }
+
+    fun detectRom(): RomVendor = when {
+        RomPermissionUtils.isXiaomi() -> RomVendor.XIAOMI
+        RomPermissionUtils.isHuawei() -> RomVendor.HUAWEI
+        RomPermissionUtils.isOppo() -> RomVendor.OPPO
+        RomPermissionUtils.isVivo() -> RomVendor.VIVO
+        else -> RomVendor.OTHER
+    }
+
+    fun isDomesticRom(): Boolean = RomPermissionUtils.isDomesticRom()
+
+    /**
+     * 是否需要引导：缺悬浮窗 / 缺后台相关 / 缺无障碍。
+     */
+    fun needsGuide(context: Context): Boolean {
+        if (!PermissionChecker.hasOverlay(context)) return true
+        if (needsAutostartBackgroundStep(context)) return true
+        return !PermissionChecker.hasAccessibility(context)
+    }
+
+    /**
+     * 特权审计应让路：分步会话进行中，或核心三步（悬浮窗/自启动后台/无障碍）仍缺。
+     * 避免与日历→电池→悬浮窗那一套叠弹、抢跳转。
+     */
+    fun shouldDeferPrivilegeAudit(context: Context): Boolean {
+        if (dialogShowing) return true
+        if (stepPending(context) > 0) return true
+        if (!PermissionChecker.hasOverlay(context)) return true
+        if (needsAutostartBackgroundStep(context)) return true
+        if (!PermissionChecker.hasAccessibility(context)) return true
+        return false
+    }
+
+    /** Activity 销毁时清理，防止 dialogShowing 假死。 */
+    fun onHostDestroyed(activity: AppCompatActivity) {
+        if (pendingActivityRef.get() === activity) {
+            dismissActiveDialog()
+            cancelScheduledNextStep()
+            pendingActivityRef = WeakReference(null)
         }
     }
 
-    fun isDomesticRom(): Boolean = detectRom() != RomVendor.OTHER
-
-    /**
-     * 是否需要弹出国产 ROM 引导：缺悬浮窗，或国产机缺电池豁免（后台易被杀）。
-     */
-    fun needsGuide(context: Context): Boolean {
-        if (!FloatingWindowPermissionHelper.hasPermission(context)) return true
-        if (!isDomesticRom()) return false
-        return !QueenBatteryHelper.isExemptFromBatteryOptimizations(context)
-    }
-
-    /** 激活后 / 接管动画结束：缺关键 ROM 权限则弹窗。 */
+    /** 激活后 / 接管动画结束：缺关键权限则弹分步引导。 */
     fun showGuideIfNeeded(activity: AppCompatActivity) {
         if (!needsGuide(activity)) {
             clearPending(activity)
+            clearStepPending(activity)
             return
         }
         showGuide(activity)
     }
 
     /**
+     * 专用于悬浮窗丢失：有 Activity 时弹引导，但遵守缺悬浮窗冷却，避免 onResume 死循环。
+     */
+    fun promptOverlayIfMissing(activity: AppCompatActivity) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        if (PermissionChecker.hasOverlay(activity)) return
+        val prefs = activity.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+        val last = prefs.getLong(PREF_GUIDE_LAST_MS, 0L)
+        if (System.currentTimeMillis() - last < OVERLAY_MISSING_COOLDOWN_MS) return
+        showGuide(activity)
+    }
+
+    /**
      * [MainActivity.onResume]：后台曾标记权限丢失，或定期提醒（带冷却）。
-     * @return 是否已展示引导
+     * 若有未完成的分步，优先续接。
      */
     fun maybeShowOnResume(activity: AppCompatActivity): Boolean {
         if (!needsGuide(activity)) {
             clearPending(activity)
+            clearStepPending(activity)
             return false
         }
         val prefs = activity.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+        val pendingStep = prefs.getInt(PREF_STEP_PENDING, 0)
+        if (pendingStep > 0) {
+            prefs.edit().putBoolean(PREF_GUIDE_PENDING, false).apply()
+            showStepByStepGuide(activity, fromStep = pendingStep)
+            return true
+        }
         if (prefs.getBoolean(PREF_GUIDE_PENDING, false)) {
             prefs.edit().putBoolean(PREF_GUIDE_PENDING, false).apply()
             showGuide(activity)
@@ -90,13 +139,18 @@ object DomesticRomGuide {
         }
         val now = System.currentTimeMillis()
         val last = prefs.getLong(PREF_GUIDE_LAST_MS, 0L)
-        if (now - last < GUIDE_COOLDOWN_MS) return false
+        val cooldown = if (!PermissionChecker.hasOverlay(activity)) {
+            OVERLAY_MISSING_COOLDOWN_MS
+        } else {
+            GUIDE_COOLDOWN_MS
+        }
+        if (now - last < cooldown) return false
         prefs.edit().putLong(PREF_GUIDE_LAST_MS, now).apply()
         showGuide(activity)
         return true
     }
 
-    /** [QueenService] 发现悬浮窗不可用，下次进 App 再弹。 */
+    /** [QueenService] / 悬浮窗看门狗发现权限丢失，下次进 App 再弹。 */
     fun markPendingFromBackground(context: Context) {
         context.applicationContext.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
             .edit()
@@ -104,52 +158,50 @@ object DomesticRomGuide {
             .apply()
     }
 
+    /**
+     * 入口：按固定顺序分步引导（悬浮窗 → 自启动/后台 → 无障碍）。
+     * 已满足的步骤自动跳过。
+     */
     fun showGuide(activity: AppCompatActivity) {
         if (activity.isFinishing || activity.isDestroyed) return
-        val messageRes = when (detectRom()) {
-            RomVendor.XIAOMI -> R.string.domestic_rom_guide_xiaomi
-            RomVendor.HUAWEI -> R.string.domestic_rom_guide_huawei
-            RomVendor.OPPO -> R.string.domestic_rom_guide_oppo
-            RomVendor.VIVO -> R.string.domestic_rom_guide_vivo
-            RomVendor.OTHER -> R.string.domestic_rom_guide_default
-        }
-        AlertDialog.Builder(activity)
-            .setTitle(activity.hon(R.string.domestic_rom_guide_title))
-            .setMessage(buildFullMessage(activity, messageRes))
-            .setPositiveButton(primaryActionLabel(activity)) { _, _ ->
-                openPrimarySettings(activity)
-            }
-            .setNeutralButton(R.string.domestic_rom_guide_pick) { _, _ ->
-                showQuickJumpMenu(activity)
-            }
-            .setNegativeButton(R.string.domestic_rom_guide_later) { _, _ ->
-                Toast.makeText(
-                    activity,
-                    R.string.domestic_rom_guide_later_toast,
-                    Toast.LENGTH_LONG,
-                ).show()
-            }
-            .setCancelable(false)
-            .show()
         activity.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
             .edit()
             .putLong(PREF_GUIDE_LAST_MS, System.currentTimeMillis())
             .apply()
+        showStepByStepGuide(activity, fromStep = 1)
     }
 
-    /** 优先打开当前最缺的一项；悬浮窗仍缺时走综合引导（悬浮窗 + 厂商中心）。 */
+    fun showStepByStepGuide(activity: AppCompatActivity, fromStep: Int = 1) {
+        if (activity.isFinishing || activity.isDestroyed) return
+        // 残留假死状态：dialog 已不在显示则复位
+        if (activeDialog != null && activeDialog?.isShowing != true) {
+            activeDialog = null
+        }
+        if (dialogShowing) return
+        cancelScheduledNextStep()
+        pendingActivityRef = WeakReference(activity)
+
+        val step = firstNeededStep(activity, fromStep) ?: run {
+            clearStepPending(activity)
+            activity.toastLong(R.string.domestic_rom_step_done)
+            return
+        }
+        when (step) {
+            GuideStep.OVERLAY -> showStep1Overlay(activity)
+            GuideStep.AUTOSTART_BACKGROUND -> showStep2AutostartBackground(activity)
+            GuideStep.ACCESSIBILITY -> showStep3Accessibility(activity)
+        }
+    }
+
+    /** 优先打开当前最缺的一项（兼容旧调用 / 分项菜单）。 */
     fun openPrimarySettings(activity: AppCompatActivity) {
         when {
-            !FloatingWindowPermissionHelper.hasPermission(activity) ->
-                RomPermissionUtils.openQueenPermissionHub(activity)
-            isDomesticRom() &&
-                !QueenBatteryHelper.isExemptFromBatteryOptimizations(activity) ->
-                QueenBatteryHelper.openBatteryExemptionSettings(activity)
-            isDomesticRom() -> {
-                if (!RomPermissionUtils.openRomExtraPermissionHub(activity)) {
-                    RomPermissionUtils.openAutoStartSettings(activity)
-                }
-            }
+            !PermissionChecker.hasOverlay(activity) ->
+                FloatingWindowPermissionHelper.requestPermission(activity)
+            needsAutostartBackgroundStep(activity) ->
+                openAutostartAndBackgroundSettings(activity)
+            !PermissionChecker.hasAccessibility(activity) ->
+                QueenAccessibilityHelper.openQueenAccessibilitySettings(activity)
             else -> RomPermissionUtils.openOverlaySettings(activity)
         }
     }
@@ -158,90 +210,211 @@ object DomesticRomGuide {
         RomPermissionUtils.openQueenPermissionHub(activity)
     }
 
-    private fun showQuickJumpMenu(activity: AppCompatActivity) {
-        if (activity.isFinishing || activity.isDestroyed) return
-        val labels = activity.resources.getStringArray(R.array.domestic_rom_guide_pick_items)
-        AlertDialog.Builder(activity)
-            .setTitle(activity.hon(R.string.domestic_rom_guide_pick_title))
-            .setItems(labels) { _, which ->
-                when (which) {
-                    0 -> RomPermissionUtils.openOverlaySettings(activity)
-                    1 -> RomPermissionUtils.openAutoStartSettings(activity)
-                    2 -> QueenBatteryHelper.openBatteryExemptionSettings(activity)
-                    3 -> {
-                        if (!RomPermissionUtils.openRomExtraPermissionHub(activity)) {
-                            RomPermissionUtils.openAutoStartSettings(activity)
+    // region Step dialogs
+
+    private fun showStep1Overlay(activity: AppCompatActivity) {
+        setStepPending(activity, GuideStep.OVERLAY.index)
+        val builder = AlertDialog.Builder(activity)
+            .setTitle(activity.hon(R.string.domestic_rom_step1_title))
+            .setMessage(activity.hon(R.string.domestic_rom_step1_message))
+            .setPositiveButton(R.string.domestic_rom_step1_go) { _, _ ->
+                FloatingWindowPermissionHelper.requestPermission(activity)
+                scheduleNextStep(activity, afterStep = GuideStep.OVERLAY.index)
+            }
+            .setNegativeButton(R.string.domestic_rom_guide_later) { _, _ ->
+                clearStepPending(activity)
+                markGuideSnoozed(activity)
+                activity.toastLong(R.string.domestic_rom_guide_later_toast)
+            }
+            .setCancelable(false)
+
+        // 仅当悬浮窗已授予时才允许「进入下一步」，禁止跳过
+        if (PermissionChecker.hasOverlay(activity)) {
+            builder.setNeutralButton(R.string.domestic_rom_step_next) { _, _ ->
+                dismissActiveDialog()
+                showStepByStepGuide(activity, fromStep = GuideStep.OVERLAY.index + 1)
+            }
+        }
+
+        showManagedDialog(builder)
+    }
+
+    private fun showStep2AutostartBackground(activity: AppCompatActivity) {
+        setStepPending(activity, GuideStep.AUTOSTART_BACKGROUND.index)
+        val messageRes = when (detectRom()) {
+            RomVendor.XIAOMI -> R.string.domestic_rom_step2_message_xiaomi
+            RomVendor.HUAWEI -> R.string.domestic_rom_step2_message_huawei
+            RomVendor.OPPO -> R.string.domestic_rom_step2_message_oppo
+            RomVendor.VIVO -> R.string.domestic_rom_step2_message_vivo
+            RomVendor.OTHER -> R.string.domestic_rom_step2_message_default
+        }
+        val builder = AlertDialog.Builder(activity)
+            .setTitle(activity.hon(R.string.domestic_rom_step2_title))
+            .setMessage(activity.hon(messageRes))
+            .setPositiveButton(R.string.domestic_rom_step2_go) { _, _ ->
+                openAutostartAndBackgroundSettings(activity)
+                scheduleNextStep(activity, afterStep = GuideStep.AUTOSTART_BACKGROUND.index)
+            }
+            .setNeutralButton(R.string.domestic_rom_step2_confirm) { _, _ ->
+                acknowledgeStep2(activity)
+                dismissActiveDialog()
+                showStepByStepGuide(activity, fromStep = GuideStep.AUTOSTART_BACKGROUND.index + 1)
+            }
+            .setNegativeButton(R.string.domestic_rom_guide_later) { _, _ ->
+                clearStepPending(activity)
+                markGuideSnoozed(activity)
+                activity.toastLong(R.string.domestic_rom_guide_later_toast)
+            }
+            .setCancelable(false)
+
+        showManagedDialog(builder)
+    }
+
+    private fun showStep3Accessibility(activity: AppCompatActivity) {
+        setStepPending(activity, GuideStep.ACCESSIBILITY.index)
+        val builder = AlertDialog.Builder(activity)
+            .setTitle(activity.hon(R.string.domestic_rom_step3_title))
+            .setMessage(activity.hon(R.string.domestic_rom_step3_message))
+            .setPositiveButton(R.string.domestic_rom_step3_go) { _, _ ->
+                QueenAccessibilityHelper.openQueenAccessibilitySettings(activity)
+                handler.postDelayed({
+                    if (!activity.isFinishing && !activity.isDestroyed) {
+                        clearStepPending(activity)
+                        if (!PermissionChecker.hasAccessibility(activity)) {
+                            setStepPending(activity, GuideStep.ACCESSIBILITY.index)
                         }
                     }
-                    4 -> RomPermissionUtils.openAppDetails(activity)
-                    else -> RomPermissionUtils.openAppDetails(activity)
+                }, NEXT_STEP_DELAY_MS)
+            }
+            .setNegativeButton(R.string.domestic_rom_guide_later) { _, _ ->
+                clearStepPending(activity)
+                markGuideSnoozed(activity)
+                activity.toastLong(R.string.domestic_rom_guide_later_toast)
+            }
+            .setCancelable(false)
+
+        if (PermissionChecker.hasAccessibility(activity)) {
+            builder.setNeutralButton(R.string.domestic_rom_step_next) { _, _ ->
+                clearStepPending(activity)
+                dismissActiveDialog()
+                activity.toastLong(R.string.domestic_rom_step_done)
+            }
+        }
+
+        showManagedDialog(builder)
+    }
+
+    // endregion
+
+    private fun showManagedDialog(builder: AlertDialog.Builder) {
+        dismissActiveDialog()
+        val dialog = builder.create()
+        activeDialog = dialog
+        dialog.setOnDismissListener {
+            if (activeDialog === dialog) {
+                activeDialog = null
+            }
+        }
+        dialog.show()
+    }
+
+    private fun dismissActiveDialog() {
+        val dialog = activeDialog
+        activeDialog = null
+        if (dialog?.isShowing == true) {
+            runCatching { dialog.dismiss() }
+        }
+    }
+
+    private fun scheduleNextStep(activity: AppCompatActivity, afterStep: Int) {
+        cancelScheduledNextStep()
+        // 保持在当前步：未完成则重弹当前步；已完成则 firstNeededStep 自动进下一步
+        setStepPending(activity, afterStep)
+        val runnable = Runnable {
+            nextStepRunnable = null
+            val act = pendingActivityRef.get() ?: activity
+            if (act.isFinishing || act.isDestroyed) return@Runnable
+            if (act.hasWindowFocus()) {
+                showStepByStepGuide(act, fromStep = afterStep)
+            }
+        }
+        nextStepRunnable = runnable
+        handler.postDelayed(runnable, NEXT_STEP_DELAY_MS)
+    }
+
+    private fun cancelScheduledNextStep() {
+        nextStepRunnable?.let { handler.removeCallbacks(it) }
+        nextStepRunnable = null
+    }
+
+    private fun firstNeededStep(context: Context, fromStep: Int): GuideStep? {
+        val steps = GuideStep.entries.filter { it.index >= fromStep }
+        for (step in steps) {
+            when (step) {
+                GuideStep.OVERLAY ->
+                    if (!PermissionChecker.hasOverlay(context)) return step
+                GuideStep.AUTOSTART_BACKGROUND ->
+                    if (needsAutostartBackgroundStep(context)) return step
+                GuideStep.ACCESSIBILITY ->
+                    if (!PermissionChecker.hasAccessibility(context)) return step
+            }
+        }
+        return null
+    }
+
+    /**
+     * 电池未豁免且用户未在引导/自检中确认 → 需要；
+     * 国产机自启动未确认 → 需要。
+     * 「我已开启」会写入确认，从而可进入第 3 步。
+     */
+    private fun needsAutostartBackgroundStep(context: Context): Boolean {
+        val batteryOk = PermissionChecker.hasBatteryExempt(context) ||
+            isConfirmed(context, "battery")
+        if (!batteryOk) return true
+        if (!isDomesticRom()) return false
+        return !isConfirmed(context, "autostart")
+    }
+
+    private fun acknowledgeStep2(context: Context) {
+        RomPermissionProbe.setUserConfirmed(context, RomPermissionProbe.CONFIRM_AUTOSTART, true)
+        RomPermissionProbe.setUserConfirmed(context, RomPermissionProbe.CONFIRM_BATTERY, true)
+    }
+
+    /** 只打开一个设置页，避免 800ms 连开两页互相覆盖。 */
+    private fun openAutostartAndBackgroundSettings(activity: AppCompatActivity) {
+        when {
+            isDomesticRom() && !isConfirmed(activity, "autostart") -> {
+                if (!RomPermissionUtils.openRomExtraPermissionHub(activity)) {
+                    RomPermissionUtils.openAutoStartSettings(activity)
                 }
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun primaryActionLabel(activity: AppCompatActivity): Int = when {
-        !FloatingWindowPermissionHelper.hasPermission(activity) ->
-            R.string.domestic_rom_guide_go
-        isDomesticRom() &&
-            !QueenBatteryHelper.isExemptFromBatteryOptimizations(activity) ->
-            if (detectRom() == RomVendor.XIAOMI) {
-                R.string.domestic_rom_guide_go_xiaomi_power
-            } else {
-                R.string.domestic_rom_guide_go_battery
-            }
-        else -> R.string.domestic_rom_guide_go_rom
-    }
-
-    private fun buildFullMessage(activity: AppCompatActivity, baseMessageRes: Int): String {
-        val base = activity.hon(baseMessageRes)
-        val statusLines = buildStatusLines(activity)
-        if (statusLines.isEmpty()) return base
-        return buildString {
-            append(base)
-            append("\n\n")
-            append(activity.getString(R.string.domestic_rom_guide_status_header))
-            append('\n')
-            statusLines.forEach { append("• ").append(it).append('\n') }
-        }.trimEnd()
-    }
-
-    private fun buildStatusLines(context: Context): List<String> {
-        val lines = mutableListOf<String>()
-        if (!FloatingWindowPermissionHelper.hasPermission(context)) {
-            lines.add(context.getString(R.string.domestic_rom_status_overlay))
-        }
-        if (isDomesticRom()) {
-            if (!QueenBatteryHelper.isExemptFromBatteryOptimizations(context)) {
-                lines.add(
-                    if (detectRom() == RomVendor.XIAOMI) {
-                        context.getString(R.string.domestic_rom_status_xiaomi_power)
-                    } else {
-                        context.getString(R.string.domestic_rom_status_battery)
-                    },
-                )
-            }
-            if (!RomPermissionProbe.isWriteSettingsAutoDetected(context)) {
-                lines.add(context.getString(R.string.domestic_rom_status_write_settings))
-            }
-            if (!isConfirmed(context, "autostart")) {
-                lines.add(
-                    if (detectRom() == RomVendor.XIAOMI) {
-                        context.getString(R.string.domestic_rom_status_xiaomi_autostart)
-                    } else {
-                        context.getString(R.string.domestic_rom_status_autostart_hint)
-                    },
-                )
-            }
-            if (!isConfirmed(context, "lock_app")) {
-                lines.add(context.getString(R.string.perm_check_item_lock_app))
-            }
-            if (!isConfirmed(context, "rom_extra")) {
-                lines.add(context.getString(R.string.perm_check_item_rom_extra))
+            !PermissionChecker.hasBatteryExempt(activity) ->
+                QueenBatteryHelper.openBatteryExemptionSettings(activity)
+            else -> {
+                if (!RomPermissionUtils.openRomExtraPermissionHub(activity)) {
+                    RomPermissionUtils.openAutoStartSettings(activity)
+                }
             }
         }
-        return lines
+    }
+
+    private fun stepPending(context: Context): Int =
+        context.applicationContext
+            .getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+            .getInt(PREF_STEP_PENDING, 0)
+
+    private fun setStepPending(context: Context, step: Int) {
+        context.applicationContext.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(PREF_STEP_PENDING, step)
+            .apply()
+    }
+
+    private fun clearStepPending(context: Context) {
+        context.applicationContext.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+            .edit()
+            .remove(PREF_STEP_PENDING)
+            .apply()
     }
 
     private fun isConfirmed(context: Context, id: String): Boolean {
@@ -252,6 +425,15 @@ object DomesticRomGuide {
     private fun clearPending(context: Context) {
         context.applicationContext.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
             .edit()
+            .putBoolean(PREF_GUIDE_PENDING, false)
+            .apply()
+    }
+
+    /** 「稍后」：刷新冷却起点，避免立刻又被 onResume 弹回。 */
+    private fun markGuideSnoozed(context: Context) {
+        context.applicationContext.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putLong(PREF_GUIDE_LAST_MS, System.currentTimeMillis())
             .putBoolean(PREF_GUIDE_PENDING, false)
             .apply()
     }

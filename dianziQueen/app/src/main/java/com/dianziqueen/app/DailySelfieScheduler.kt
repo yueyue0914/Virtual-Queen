@@ -38,6 +38,8 @@ object DailySelfieScheduler {
 
     fun shouldEnforce(context: Context): Boolean {
         if (!isActivated(context)) return false
+        // 最强控制已关：不再强制每日自拍
+        if (!SettingsLockGuard.isStrongControlEnabled(context)) return false
         if (isSubmittedToday(context)) return false
         val triggerAt = ensureTodaySchedule(context)
         return System.currentTimeMillis() >= triggerAt

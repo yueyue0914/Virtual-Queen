@@ -31,6 +31,10 @@ class DianziQueenApp : Application() {
         initQueenMessageLibrary()
         QueenErrorLogCollector.start(this)
         UninstallGuard.onAppColdStart(this)
+        // 任意组件唤醒进程时重新挂看门狗，避免清后台后闹钟空窗
+        if (getSharedPreferences(Prefs.NAME, MODE_PRIVATE).getBoolean(Prefs.ACTIVATED, false)) {
+            QueenKeepAlive.scheduleWatchdog(this)
+        }
     }
 
     /** 在此追加女王消息池文案（与 [QueenInsultLibrary] 默认库合并）。 */

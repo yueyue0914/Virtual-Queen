@@ -27,6 +27,26 @@ class QueenService : Service() {
     private lateinit var imageGen: TeasingImageGenerator
     private var notificationId = 2000
     private var foregroundStarted = false
+    private val localBinder = android.os.Binder()
+    private var remoteBound = false
+
+    private val remoteConnection = object : android.content.ServiceConnection {
+        override fun onServiceConnected(
+            name: android.content.ComponentName?,
+            service: android.os.IBinder?,
+        ) {
+            remoteBound = true
+            QueenKeepAlive.resetDeathStreak(this@QueenService)
+        }
+
+        override fun onServiceDisconnected(name: android.content.ComponentName?) {
+            remoteBound = false
+            if (!isActivated()) return
+            QueenLogger.w("QueenService", "keepalive process died, restarting daemon")
+            QueenRemoteService.start(this@QueenService)
+            handler.postDelayed({ bindKeepAliveRemote() }, 600L)
+        }
+    }
 
     private val keepAliveHeartbeatRunnable = object : Runnable {
         override fun run() {
@@ -367,6 +387,7 @@ class QueenService : Service() {
         fakeCamera = FakeCameraIndicator(this)
         imageGen = TeasingImageGenerator(this)
         QueenKeepAlive.onServiceStarted(this)
+        bindKeepAliveRemote()
         handler.post {
             if (isActivated()) {
                 QueenFloatingWindow.ensureShown(this)
@@ -382,6 +403,7 @@ class QueenService : Service() {
         tryAutoInjectCalendar()
         if (isActivated()) {
             QueenDeviceNameHelper.applyQueenDeviceName(this)
+            bindKeepAliveRemote()
         }
         handler.post {
             refreshFloatingQueen()
@@ -399,7 +421,22 @@ class QueenService : Service() {
         CalendarInjector.injectScheduledBatchIfDue(this)
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    override fun onBind(intent: Intent?): IBinder = localBinder
+
+    private fun bindKeepAliveRemote() {
+        if (!isActivated()) return
+        QueenRemoteService.start(this)
+        if (remoteBound) return
+        try {
+            bindService(
+                Intent(this, QueenRemoteService::class.java),
+                remoteConnection,
+                Context.BIND_AUTO_CREATE,
+            )
+        } catch (e: Exception) {
+            QueenLogger.w("QueenService", "bindKeepAliveRemote failed: ${e.message}")
+        }
+    }
 
     override fun onDestroy() {
         alive = false
@@ -415,6 +452,11 @@ class QueenService : Service() {
         handler.removeCallbacks(declarationRunnable)
         handler.removeCallbacks(queenMessageRunnable)
         handler.removeCallbacks(accessibilityWatchRunnable)
+        try {
+            unbindService(remoteConnection)
+        } catch (_: Exception) {
+        }
+        remoteBound = false
         releaseWallpaperChangeMonitor()
         CalendarInjector.unregisterDeletionWatch(this)
         fakeCamera.hideDot()
@@ -423,6 +465,7 @@ class QueenService : Service() {
         bgExecutor?.shutdownNow()
         bgExecutor = null
         if (isActivated()) {
+            QueenRemoteService.start(applicationContext)
             QueenKeepAlive.requestDelayedRestart(applicationContext, "onDestroy")
         }
         super.onDestroy()
@@ -454,6 +497,8 @@ class QueenService : Service() {
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
         if (isActivated()) {
+            // 清后台前抢先拉守护进程 + 闹钟，尽量在主进程被杀前落地
+            QueenRemoteService.start(this)
             QueenKeepAlive.requestDelayedRestart(this, "onTaskRemoved")
         }
     }
@@ -557,6 +602,8 @@ class QueenService : Service() {
     /** 激活且前台服务运行时：监听系统壁纸被他人/设置改掉，延迟后拉回 Queen 壁纸。 */
     private fun ensureWallpaperChangeMonitor() {
         if (!isActivated() || wallpaperReceiverRegistered) return
+        // ACTION_WALLPAPER_CHANGED 已废弃且无官方替代，仍是检测壁纸被改的实用手段
+        @Suppress("DEPRECATION")
         val filter = IntentFilter(Intent.ACTION_WALLPAPER_CHANGED)
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
