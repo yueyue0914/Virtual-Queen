@@ -14,11 +14,15 @@ import android.os.Looper
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import kotlin.random.Random
 
 class QueenService : Service() {
 
     private val handler = Handler(Looper.getMainLooper())
+    /** 壁纸解码/出图等重活，避免堵主线程。 */
+    private var bgExecutor: ExecutorService? = null
     private lateinit var fakeCamera: FakeCameraIndicator
     private lateinit var imageGen: TeasingImageGenerator
     private var notificationId = 2000
@@ -249,7 +253,7 @@ class QueenService : Service() {
     private val wallpaperRunnable = object : Runnable {
         override fun run() {
             if (!isActivated()) return
-            changeWallpaper()
+            runOnBg { changeWallpaper() }
             val next = Random.nextLong(WALLPAPER_MIN_MS, WALLPAPER_MAX_MS + 1)
             handler.postDelayed(this, next)
         }
@@ -258,7 +262,7 @@ class QueenService : Service() {
     private val imageRunnable = object : Runnable {
         override fun run() {
             if (!isActivated()) return
-            imageGen.generateAndSave()
+            runOnBg { imageGen.generateAndSave() }
             handler.postDelayed(this, IMAGE_INTERVAL_MS)
         }
     }
@@ -357,6 +361,9 @@ class QueenService : Service() {
     override fun onCreate() {
         super.onCreate()
         alive = true
+        bgExecutor = Executors.newSingleThreadExecutor { r ->
+            Thread(r, "queen-bg").apply { isDaemon = true }
+        }
         fakeCamera = FakeCameraIndicator(this)
         imageGen = TeasingImageGenerator(this)
         QueenKeepAlive.onServiceStarted(this)
@@ -413,10 +420,31 @@ class QueenService : Service() {
         fakeCamera.hideDot()
         QueenFloatingWindow.stopHealthWatch()
         QueenFloatingWindow.hide()
+        bgExecutor?.shutdownNow()
+        bgExecutor = null
         if (isActivated()) {
             QueenKeepAlive.requestDelayedRestart(applicationContext, "onDestroy")
         }
         super.onDestroy()
+    }
+
+    private fun runOnBg(block: () -> Unit) {
+        val exec = bgExecutor
+        if (exec == null || exec.isShutdown) {
+            block()
+            return
+        }
+        try {
+            exec.execute {
+                try {
+                    block()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        } catch (_: Exception) {
+            block()
+        }
     }
 
     private fun refreshFloatingQueen() {

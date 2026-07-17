@@ -6,6 +6,7 @@ import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -72,6 +73,7 @@ object QueenFloatingOverlay {
     private var touchStartRawX = 0f
     private var touchStartRawY = 0f
     private var dragging = false
+    private var lastDragLayoutMs = 0L
     private var pointerDownOnAvatar = false
     private var menuCompanionHidden = false
 
@@ -282,8 +284,7 @@ object QueenFloatingOverlay {
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -332,9 +333,13 @@ object QueenFloatingOverlay {
                         params.width = WindowManager.LayoutParams.WRAP_CONTENT
                         params.height = WindowManager.LayoutParams.WRAP_CONTENT
                         clampToScreen(params)
-                        try {
-                            wm.updateViewLayout(root, params)
-                        } catch (_: Exception) { }
+                        val now = SystemClock.uptimeMillis()
+                        if (now - lastDragLayoutMs >= 16L) {
+                            lastDragLayoutMs = now
+                            try {
+                                wm.updateViewLayout(root, params)
+                            } catch (_: Exception) { }
+                        }
                     }
                     true
                 }
@@ -342,6 +347,9 @@ object QueenFloatingOverlay {
                     if (dragging) {
                         snapToNearestEdge(params)
                         savePosition(params.x, params.y)
+                        try {
+                            wm.updateViewLayout(root, params)
+                        } catch (_: Exception) { }
                         handler.post {
                             applyBubblePlacement()
                             refreshWindowLayout()

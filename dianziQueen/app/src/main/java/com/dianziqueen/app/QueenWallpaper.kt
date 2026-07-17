@@ -120,7 +120,7 @@ object QueenWallpaper {
         var bmp: Bitmap? = null
         return try {
             val (targetW, targetH) = wallpaperTargetSize(context)
-            val decoded = BitmapFactory.decodeResource(res, resId) ?: return false
+            val decoded = decodeResourceForWallpaper(res, resId, targetW, targetH) ?: return false
             bmp = decoded
             if (applyWallpaper(context, decoded)) {
                 Log.i(TAG, "raw bitmap wallpaper applied: $resId (${targetW}x$targetH)")
@@ -325,20 +325,44 @@ object QueenWallpaper {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        return BitmapFactory.decodeByteArray(
+            bytes,
+            0,
+            bytes.size,
+            decodeOptionsForWallpaper(bounds, targetW, targetH),
+        )
+    }
+
+    private fun decodeResourceForWallpaper(
+        res: android.content.res.Resources,
+        resId: Int,
+        targetW: Int,
+        targetH: Int,
+    ): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeResource(res, resId, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        return BitmapFactory.decodeResource(
+            res,
+            resId,
+            decodeOptionsForWallpaper(bounds, targetW, targetH),
+        )
+    }
+
+    private fun decodeOptionsForWallpaper(
+        bounds: BitmapFactory.Options,
+        targetW: Int,
+        targetH: Int,
+    ): BitmapFactory.Options {
         var sample = 1
         val maxDim = max(targetW, targetH)
         while (max(bounds.outWidth / sample, bounds.outHeight / sample) > maxDim * 2) {
             sample *= 2
         }
-        return BitmapFactory.decodeByteArray(
-            bytes,
-            0,
-            bytes.size,
-            BitmapFactory.Options().apply {
-                inSampleSize = sample
-                inPreferredConfig = Bitmap.Config.ARGB_8888
-            },
-        )
+        return BitmapFactory.Options().apply {
+            inSampleSize = sample
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
     }
 
     /** 居中裁剪/放大到目标分辨率，避免 MIUI 拉伸过小 Bitmap 成黑屏。 */

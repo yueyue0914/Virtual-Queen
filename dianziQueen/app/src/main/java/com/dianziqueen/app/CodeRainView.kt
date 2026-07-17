@@ -14,6 +14,7 @@ import kotlin.random.Random
 /**
  * 主界面背景：整句文案纵向排列（首字在底、向上读），整列自上而下飘落。
  * 每句带景深（远近大小/透明度/速度不同）；车道分配避免句间重叠。
+ * 激活后停止动画循环，仅保留静态底色，避免常驻掉帧。
  */
 class CodeRainView @JvmOverloads constructor(
     context: Context,
@@ -26,6 +27,8 @@ class CodeRainView @JvmOverloads constructor(
         private const val COLOR_GATE = 0xFF00E676.toInt()
         private const val DEPTH_MIN = 0.32f
         private const val DEPTH_MAX = 1f
+        /** 约 10–12fps，足够看清飘落且显著低于原先 21fps。 */
+        private const val FRAME_DELAY_MS = 90L
     }
 
     private val rainPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -38,7 +41,6 @@ class CodeRainView @JvmOverloads constructor(
     private var activatedMode = false
     private var phrases: List<String> = emptyList()
     private val falling = mutableListOf<FallingBlock>()
-    private val frameDelay = 48L
     private val spawnChance = 0.07f
 
     /** 基准字号（近处句子的尺寸） */
@@ -72,15 +74,14 @@ class CodeRainView @JvmOverloads constructor(
 
     private val updateRunnable = object : Runnable {
         override fun run() {
-            if (!isAttachedToWindow) return
+            if (!isAttachedToWindow || activatedMode) return
             tick()
             invalidate()
-            handler.postDelayed(this, frameDelay)
+            handler.postDelayed(this, FRAME_DELAY_MS)
         }
     }
 
     init {
-        setLayerType(LAYER_TYPE_SOFTWARE, null)
         updateBaseTextSize()
     }
 
@@ -91,6 +92,12 @@ class CodeRainView @JvmOverloads constructor(
         if (modeChanged) {
             falling.clear()
             laneBusy.fill(false)
+        }
+        if (activated) {
+            stopAnimationLoop()
+            invalidate()
+        } else if (isAttachedToWindow) {
+            startAnimationLoop()
         }
     }
 
@@ -103,12 +110,23 @@ class CodeRainView @JvmOverloads constructor(
         if (phrases.isEmpty()) {
             reloadPhrases(activatedMode)
         }
-        handler.post(updateRunnable)
+        if (!activatedMode) {
+            startAnimationLoop()
+        }
     }
 
     override fun onDetachedFromWindow() {
-        handler.removeCallbacks(updateRunnable)
+        stopAnimationLoop()
         super.onDetachedFromWindow()
+    }
+
+    private fun startAnimationLoop() {
+        handler.removeCallbacks(updateRunnable)
+        handler.post(updateRunnable)
+    }
+
+    private fun stopAnimationLoop() {
+        handler.removeCallbacks(updateRunnable)
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -218,6 +236,7 @@ class CodeRainView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         canvas.drawColor(Color.BLACK)
+        if (activatedMode || falling.isEmpty()) return
         val sorted = falling.sortedBy { it.depth }
         for (b in sorted) {
             rainPaint.textSize = b.textSize

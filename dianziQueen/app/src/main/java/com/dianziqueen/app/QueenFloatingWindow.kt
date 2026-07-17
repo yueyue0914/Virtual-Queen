@@ -14,7 +14,7 @@ import androidx.appcompat.app.AppCompatActivity
 object QueenFloatingWindow {
 
     private val handler = Handler(Looper.getMainLooper())
-    private const val HEALTH_CHECK_MS = 25_000L
+    private const val HEALTH_CHECK_MS = 60_000L
     private var healthWatchRunning = false
 
     private val healthRunnable = object : Runnable {
@@ -44,6 +44,9 @@ object QueenFloatingWindow {
 
     /** 与 [QueenService] 等后台场景配合：有权限则展示，无权限则收起并标记待引导。 */
     fun ensureShown(context: Context) {
+        if (QueenFloatingOverlay.isShowing() && QueenFloatingOverlay.isAttached()) {
+            return
+        }
         if (!PermissionChecker.hasOverlay(context)) {
             hide()
             if (QueenFloatingOverlay.isActivated(context)) {
@@ -51,7 +54,9 @@ object QueenFloatingWindow {
             }
             return
         }
-        QueenFloatingOverlay.reattachIfNeeded()
+        if (!QueenFloatingOverlay.isAttached()) {
+            QueenFloatingOverlay.reattachIfNeeded()
+        }
         QueenFloatingOverlay.ensureShown(context)
         if (DomesticRomGuide.isDomesticRom() &&
             !PermissionChecker.hasBatteryExempt(context) &&

@@ -97,7 +97,10 @@ class AlbumTabController(
     init {
         albumGrid.layoutManager = GridLayoutManager(activity, 3)
         albumGrid.adapter = adapter
-        adapter.setBitmapLoader { id -> thumbCache.get(id) ?: loadThumbnail(id) }
+        adapter.setAsyncThumbnails(
+            getCached = { id -> thumbCache.get(thumbnailCacheKey(id)) },
+            requestLoad = { id -> preloadThumbnail(id) },
+        )
 
         albumAddButton.setOnClickListener { showAddPhotoDialog() }
     }
@@ -178,71 +181,94 @@ class AlbumTabController(
     }
 
     private fun importFromBytes(bytes: ByteArray) {
-        val id = QueenAlbumVault.importPlainBytes(activity, bytes)
-        if (id == null) {
-            Toast.makeText(activity, R.string.album_import_failed, Toast.LENGTH_SHORT).show()
-            return
+        decodeExecutor.execute {
+            val id = QueenAlbumVault.importPlainBytes(activity, bytes)
+            activity.runOnUiThread {
+                if (id == null) {
+                    Toast.makeText(activity, R.string.album_import_failed, Toast.LENGTH_SHORT).show()
+                    return@runOnUiThread
+                }
+                preloadThumbnail(id)
+                refreshGrid()
+                val points = awardAlbumImportPoints(1)
+                Toast.makeText(activity, withPoints(R.string.album_import_ok, points), Toast.LENGTH_SHORT).show()
+            }
         }
-        preloadThumbnail(id)
-        refreshGrid()
-        val points = awardAlbumImportPoints(1)
-        Toast.makeText(activity, withPoints(R.string.album_import_ok, points), Toast.LENGTH_SHORT).show()
     }
 
     private fun importFromUri(uri: Uri, eraseGallerySource: Boolean) {
-        val id = readAndImportUri(uri)
-        if (id == null) {
-            Toast.makeText(activity, R.string.album_import_failed, Toast.LENGTH_SHORT).show()
-            return
-        }
-        preloadThumbnail(id)
-        refreshGrid()
-        val points = awardAlbumImportPoints(1)
-        if (eraseGallerySource) {
-            photoDeleteHelper.deleteAfterVaultImport(uri) { deleted ->
-                activity.runOnUiThread {
-                    val msg = if (deleted) {
-                        R.string.album_import_ok_deleted
-                    } else {
-                        R.string.album_import_delete_failed
+        PhotoDeleteHelper.takePersistableAccess(activity, uri)
+        decodeExecutor.execute {
+            val id = readAndImportUri(uri)
+            activity.runOnUiThread {
+                if (id == null) {
+                    Toast.makeText(activity, R.string.album_import_failed, Toast.LENGTH_SHORT).show()
+                    return@runOnUiThread
+                }
+                preloadThumbnail(id)
+                refreshGrid()
+                val points = awardAlbumImportPoints(1)
+                if (eraseGallerySource) {
+                    photoDeleteHelper.deleteAfterVaultImport(uri) { deleted ->
+                        activity.runOnUiThread {
+                            val msg = if (deleted) {
+                                R.string.album_import_ok_deleted
+                            } else {
+                                R.string.album_import_delete_failed
+                            }
+                            Toast.makeText(activity, withPoints(msg, points), Toast.LENGTH_LONG).show()
+                        }
                     }
-                    Toast.makeText(activity, withPoints(msg, points), Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(
+                        activity,
+                        withPoints(R.string.album_import_ok, points),
+                        Toast.LENGTH_SHORT,
+                    ).show()
                 }
             }
-        } else {
-            Toast.makeText(activity, withPoints(R.string.album_import_ok, points), Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun importFromUris(uris: List<Uri>) {
-        var ok = 0
-        var failed = 0
-        val importedUris = mutableListOf<Uri>()
         for (uri in uris) {
             PhotoDeleteHelper.takePersistableAccess(activity, uri)
-            val id = readAndImportUri(uri)
-            if (id == null) {
-                failed++
-                continue
+        }
+        decodeExecutor.execute {
+            var ok = 0
+            var failed = 0
+            val importedUris = mutableListOf<Uri>()
+            val importedIds = mutableListOf<String>()
+            for (uri in uris) {
+                val id = readAndImportUri(uri)
+                if (id == null) {
+                    failed++
+                    continue
+                }
+                importedIds.add(id)
+                importedUris.add(uri)
+                ok++
             }
-            preloadThumbnail(id)
-            importedUris.add(uri)
-            ok++
-        }
-        refreshGrid()
-        if (ok == 0) {
-            Toast.makeText(activity, R.string.album_import_failed, Toast.LENGTH_SHORT).show()
-            return
-        }
-        val points = awardAlbumImportPoints(ok)
-        val msg = if (failed == 0) {
-            activity.getString(R.string.album_import_batch_ok, ok)
-        } else {
-            activity.getString(R.string.album_import_batch_partial, ok, failed)
-        }
-        Toast.makeText(activity, "$msg · +$points 积分", Toast.LENGTH_LONG).show()
-        for (uri in importedUris) {
-            photoDeleteHelper.deleteAfterVaultImport(uri) { }
+            activity.runOnUiThread {
+                for (id in importedIds) {
+                    preloadThumbnail(id)
+                }
+                refreshGrid()
+                if (ok == 0) {
+                    Toast.makeText(activity, R.string.album_import_failed, Toast.LENGTH_SHORT).show()
+                    return@runOnUiThread
+                }
+                val points = awardAlbumImportPoints(ok)
+                val msg = if (failed == 0) {
+                    activity.getString(R.string.album_import_batch_ok, ok)
+                } else {
+                    activity.getString(R.string.album_import_batch_partial, ok, failed)
+                }
+                Toast.makeText(activity, "$msg · +$points 积分", Toast.LENGTH_LONG).show()
+                for (uri in importedUris) {
+                    photoDeleteHelper.deleteAfterVaultImport(uri) { }
+                }
+            }
         }
     }
 

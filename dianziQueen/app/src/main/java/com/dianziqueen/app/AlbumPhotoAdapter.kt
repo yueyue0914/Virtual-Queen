@@ -14,10 +14,16 @@ class AlbumPhotoAdapter(
     private val onPhotoLongClick: (String) -> Unit,
 ) : ListAdapter<String, AlbumPhotoAdapter.Holder>(Diff) {
 
-    private var bitmapLoader: ((String) -> android.graphics.Bitmap?)? = null
+    private var cachedBitmapProvider: ((String) -> android.graphics.Bitmap?)? = null
+    private var requestLoad: ((String) -> Unit)? = null
 
-    fun setBitmapLoader(loader: (String) -> android.graphics.Bitmap?) {
-        bitmapLoader = loader
+    /** 缓存命中立刻显示；未命中先占位，再通过 [requestLoad] 异步解码。 */
+    fun setAsyncThumbnails(
+        getCached: (String) -> android.graphics.Bitmap?,
+        requestLoad: (String) -> Unit,
+    ) {
+        cachedBitmapProvider = getCached
+        this.requestLoad = requestLoad
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
@@ -28,7 +34,11 @@ class AlbumPhotoAdapter(
 
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val id = getItem(position)
-        holder.bind(id, bitmapLoader?.invoke(id))
+        val cached = cachedBitmapProvider?.invoke(id)
+        holder.bind(id, cached)
+        if (cached == null) {
+            requestLoad?.invoke(id)
+        }
         holder.itemView.setOnClickListener { onPhotoClick(id) }
         holder.itemView.setOnLongClickListener {
             onPhotoLongClick(id)
@@ -43,6 +53,7 @@ class AlbumPhotoAdapter(
         fun bind(photoId: String, bitmap: android.graphics.Bitmap?) {
             if (bitmap != null) {
                 thumb.setImageBitmap(bitmap)
+                thumb.setBackgroundColor(0)
             } else {
                 thumb.setImageDrawable(null)
                 thumb.setBackgroundColor(0xFF1A0D0D.toInt())
