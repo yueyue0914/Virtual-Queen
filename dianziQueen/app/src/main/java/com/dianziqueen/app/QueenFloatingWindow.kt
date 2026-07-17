@@ -19,7 +19,7 @@ object QueenFloatingWindow {
 
     private val handler = Handler(Looper.getMainLooper())
     /** 小米/红米杀悬浮窗较快，健康检查不宜过长。 */
-    private const val HEALTH_CHECK_MS = 25_000L
+    private const val HEALTH_CHECK_MS = 60_000L
     private var healthWatchRunning = false
 
     private val healthRunnable = object : Runnable {
@@ -32,11 +32,6 @@ object QueenFloatingWindow {
                     DomesticRomGuide.markPendingFromBackground(ctx)
                 } else {
                     QueenFloatingOverlay.reattachIfNeeded()
-                    if (DomesticRomGuide.isDomesticRom() &&
-                        !PermissionChecker.hasBatteryExempt(ctx)
-                    ) {
-                        DomesticRomGuide.markPendingFromBackground(ctx)
-                    }
                 }
             }
             handler.postDelayed(this, HEALTH_CHECK_MS)

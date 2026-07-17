@@ -21,8 +21,10 @@ class QueenAccessibilityService : AccessibilityService() {
         val prefs = getSharedPreferences(Prefs.NAME, MODE_PRIVATE)
         if (!prefs.getBoolean(Prefs.ACTIVATED, false)) return
 
-        // 无障碍仍活着时，顺手把被清掉的主服务拉回来
-        maybeEnsureKeepAlive()
+        // 无障碍高频事件里绝不能每次读偏好；仅窗口切换且稀疏检查
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            maybeEnsureKeepAlive()
+        }
 
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ->
@@ -35,9 +37,10 @@ class QueenAccessibilityService : AccessibilityService() {
 
     private fun maybeEnsureKeepAlive() {
         val now = android.os.SystemClock.elapsedRealtime()
-        if (now - lastKeepAliveEnsureAt < 25_000L) return
-        if (QueenKeepAlive.isServiceHealthy(this)) return
+        if (now - lastKeepAliveEnsureAt < 120_000L) return
         lastKeepAliveEnsureAt = now
+        if (QueenService.isAlive()) return
+        if (QueenKeepAlive.isServiceHealthy(this)) return
         QueenKeepAlive.ensureRunning(applicationContext, notifyIfRestored = false)
     }
 

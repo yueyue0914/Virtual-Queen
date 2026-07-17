@@ -4,14 +4,17 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.WindowManager
 
 /**
- * 1×1 透明 Activity：App 进入后台时拉起，把进程优先级从 HIDDEN 提到 VISIBLE。
- * 不自动 finish；由 [DianziQueenApp] 在其它界面回到前台时 [dismiss]。
+ * 1×1 透明 Activity：进后台时短暂拉起抬优先级；约 2.5s 后自动 finish，避免常驻导致卡顿。
  */
 class KeepAlivePixelActivity : Activity() {
+
+    private val handler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,13 +34,27 @@ class KeepAlivePixelActivity : Activity() {
         )
     }
 
+    override fun onResume() {
+        super.onResume()
+        handler.removeCallbacks(finishRunnable)
+        handler.postDelayed(finishRunnable, 2_500L)
+    }
+
     override fun onDestroy() {
+        handler.removeCallbacks(finishRunnable)
         if (instance === this) instance = null
         super.onDestroy()
     }
 
+    private val finishRunnable = Runnable {
+        if (isFinishing) return@Runnable
+        finish()
+        @Suppress("DEPRECATION")
+        overridePendingTransition(0, 0)
+    }
+
     companion object {
-        private const val SHOW_COOLDOWN_MS = 20_000L
+        private const val SHOW_COOLDOWN_MS = 90_000L
 
         @Volatile
         private var instance: KeepAlivePixelActivity? = null

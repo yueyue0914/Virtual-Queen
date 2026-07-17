@@ -11,10 +11,9 @@ import androidx.core.app.NotificationCompat
  * 激活后尽量扛住国产机「清理内存 / 一键加速」：
  * - 前台服务 + START_STICKY（见 [QueenService]）
  * - 独立进程守护（见 [QueenRemoteService]）
- * - AlarmClock / 精确闹钟看门狗 + 密集延迟复活
- * - 辅助功能连接时借壳拉起（见 [QueenAccessibilityService]）
- * - 通知监听 NLS 事件级复活（见 [QueenNotificationListener]）
- * - 后台 1 像素 Activity 抬优先级（见 [KeepAlivePixelActivity]）
+ * - 低频精确闹钟看门狗（不用 AlarmClock，避免系统闹钟风暴卡顿）
+ * - 辅助功能 / 通知监听借壳拉起
+ * - 短暂 1 像素 Activity 抬优先级（见 [KeepAlivePixelActivity]）
  *
  * 无法绕过用户「强制停止」或部分 ROM 硬杀，需配合自启动/电池无限制/多任务锁定。
  */
@@ -25,14 +24,14 @@ object QueenKeepAlive {
     private const val ALARM_RESTART = 91_002
     private const val NOTIFY_ID_RESTORED = 2010
 
-    /** 看门狗间隔：清后台后尽快拉回。 */
-    private const val WATCHDOG_INTERVAL_MS = 20_000L
+    /** 常规看门狗：过密会拖慢整机。 */
+    private const val WATCHDOG_INTERVAL_MS = 2 * 60_000L
 
-    /** 清后台后密集复活闹钟。 */
-    private val RESTART_BURST_DELAYS_MS = longArrayOf(1_200L, 3_500L, 8_000L, 18_000L)
+    /** 清后台后少量复活闹钟（勿用 AlarmClock 连环排程）。 */
+    private val RESTART_BURST_DELAYS_MS = longArrayOf(3_000L, 15_000L)
 
     /** 阶梯复活：避开系统清理窗口的连续扫描。 */
-    private val RESTART_DELAYS_MS = longArrayOf(2_000L, 10_000L, 30_000L)
+    private val RESTART_DELAYS_MS = longArrayOf(5_000L, 20_000L, 45_000L)
 
     private const val DEATH_STREAK_RESET_MS = 5 * 60_000L
 
@@ -40,10 +39,18 @@ object QueenKeepAlive {
     private const val HEARTBEAT_STALE_MS = 3 * 60_000L
 
     /** NLS 收到通知时拉起主服务的最小间隔，避免通知风暴。 */
-    private const val NLS_ENSURE_MIN_INTERVAL_MS = 30_000L
+    private const val NLS_ENSURE_MIN_INTERVAL_MS = 60_000L
+
+    private const val WATCHDOG_RESCHEDULE_MIN_MS = 30_000L
 
     @Volatile
     private var lastNlsEnsureAt = 0L
+
+    @Volatile
+    private var lastWatchdogScheduledAt = 0L
+
+    @Volatile
+    private var lastEnsureFloatAt = 0L
 
     fun shouldEnsureRunning(context: Context): Boolean = isActivated(context)
 
@@ -104,7 +111,8 @@ object QueenKeepAlive {
             QueenRemoteService.stop(app)
             return
         }
-        if (!QueenService.isAlive()) {
+        val needStart = !QueenService.isAlive()
+        if (needStart) {
             QueenLogger.w(TAG, "QueenService not alive, restarting foreground service")
             try {
                 QueenService.start(app)
@@ -114,14 +122,26 @@ object QueenKeepAlive {
             if (notifyIfRestored) {
                 notifyServiceRestored(app)
             }
+            QueenRemoteService.start(app)
         }
-        QueenRemoteService.start(app)
-        QueenFloatingWindow.ensureShown(app)
+        maybeEnsureFloating(app)
         scheduleWatchdog(app)
     }
 
+    private fun maybeEnsureFloating(app: Context) {
+        val now = System.currentTimeMillis()
+        if (QueenFloatingWindow.isShowing() &&
+            QueenFloatingOverlay.isAttached() &&
+            now - lastEnsureFloatAt < 60_000L
+        ) {
+            return
+        }
+        lastEnsureFloatAt = now
+        QueenFloatingWindow.ensureShown(app)
+    }
+
     fun onWatchdogAlarm(context: Context) {
-        ensureRunning(context.applicationContext, notifyIfRestored = true)
+        ensureRunning(context.applicationContext, notifyIfRestored = false)
     }
 
     fun recordDeath(context: Context, reason: String) {
@@ -164,7 +184,7 @@ object QueenKeepAlive {
         scheduleWatchdog(app)
     }
 
-    /** 用 AlarmClock + 多档精确闹钟密集拉起，提高清后台后的复活率。 */
+    /** 清后台后少量精确闹钟拉起；不用 AlarmClock，避免状态栏闹钟风暴导致整机卡顿。 */
     private fun scheduleRestartBurst(app: Context) {
         val am = app.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         val now = System.currentTimeMillis()
@@ -180,27 +200,7 @@ object QueenKeepAlive {
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
-            scheduleAlarmClockOrExact(am, app, now + delay, pi)
-        }
-    }
-
-    private fun scheduleAlarmClockOrExact(
-        am: AlarmManager,
-        app: Context,
-        triggerAt: Long,
-        pi: PendingIntent,
-    ) {
-        try {
-            val show = PendingIntent.getActivity(
-                app,
-                ALARM_RESTART + 80,
-                Intent(app, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-            am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, show), pi)
-        } catch (e: Exception) {
-            QueenLogger.w(TAG, "setAlarmClock failed, fallback exact: ${e.message}")
-            scheduleWakeAlarm(am, triggerAt, pi)
+            scheduleWakeAlarm(am, now + delay, pi)
         }
     }
 
@@ -210,6 +210,9 @@ object QueenKeepAlive {
             cancelWatchdog(app)
             return
         }
+        val now = System.currentTimeMillis()
+        if (now - lastWatchdogScheduledAt < WATCHDOG_RESCHEDULE_MIN_MS) return
+        lastWatchdogScheduledAt = now
         val am = app.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         val intent = Intent(app, KeepAliveReceiver::class.java).apply {
             action = KeepAliveReceiver.ACTION_WATCHDOG
@@ -220,7 +223,7 @@ object QueenKeepAlive {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        scheduleAlarmClockOrExact(am, app, System.currentTimeMillis() + WATCHDOG_INTERVAL_MS, pi)
+        scheduleWakeAlarm(am, now + WATCHDOG_INTERVAL_MS, pi)
     }
 
     fun cancelWatchdog(context: Context) {

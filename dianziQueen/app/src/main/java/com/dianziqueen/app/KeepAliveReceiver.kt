@@ -42,7 +42,7 @@ class KeepAliveReceiver : BroadcastReceiver() {
         const val ACTION_WATCHDOG = "com.dianziqueen.app.action.KEEPALIVE_WATCHDOG"
         const val ACTION_RESTART = "com.dianziqueen.app.action.KEEPALIVE_RESTART"
 
-        private const val SYSTEM_EVENT_MIN_INTERVAL_MS = 20_000L
+        private const val SYSTEM_EVENT_MIN_INTERVAL_MS = 60_000L
 
         @Volatile
         private var lastSystemEventAt = 0L

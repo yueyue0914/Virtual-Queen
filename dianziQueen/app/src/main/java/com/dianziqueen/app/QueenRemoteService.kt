@@ -181,16 +181,10 @@ class QueenRemoteService : Service() {
         }
         val triggerAt = System.currentTimeMillis() + 2_500L
         try {
-            val show = PendingIntent.getActivity(
-                this,
-                SELF_RESTART_REQ + 1,
-                Intent(this, MainActivity::class.java),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-            am.setAlarmClock(AlarmManager.AlarmClockInfo(triggerAt, show), pi)
+            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
         } catch (_: Exception) {
             try {
-                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
             } catch (_: Exception) {
                 am.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + 2_500L, pi)
             }
@@ -204,7 +198,11 @@ class QueenRemoteService : Service() {
         private const val TAG = "QueenRemote"
         private const val FG_ID = 9101
         private const val SELF_RESTART_REQ = 91_101
-        private const val POLL_MS = 25_000L
+        private const val POLL_MS = 60_000L
+        private const val START_MIN_INTERVAL_MS = 20_000L
+
+        @Volatile
+        private var lastStartAt = 0L
 
         fun start(context: Context) {
             val app = context.applicationContext
@@ -213,6 +211,9 @@ class QueenRemoteService : Service() {
             ) {
                 return
             }
+            val now = System.currentTimeMillis()
+            if (now - lastStartAt < START_MIN_INTERVAL_MS) return
+            lastStartAt = now
             val i = Intent(app, QueenRemoteService::class.java)
             try {
                 app.startForegroundService(i)

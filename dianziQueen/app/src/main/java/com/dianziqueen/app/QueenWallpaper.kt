@@ -6,11 +6,16 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Shader
 import android.os.Build
 import android.util.Log
+import android.view.WindowManager
+import androidx.exifinterface.media.ExifInterface
+import java.io.ByteArrayInputStream
 import kotlin.math.max
+import kotlin.math.roundToInt
 import kotlin.random.Random
 
 object QueenWallpaper {
@@ -285,21 +290,42 @@ object QueenWallpaper {
         }
     }
 
+    /**
+     * 壁纸按**当前屏幕真实宽高比**准备，不要用 desiredMinimumWidth（多为屏宽×2 的滑动壁纸缓冲），
+     * 否则相册竖图居中裁切后会出现「人像被切偏 / 放大怪异 / 上下黑边感」。
+     */
     private fun wallpaperTargetSize(context: Context): Pair<Int, Int> {
-        val wm = WallpaperManager.getInstance(context)
         val dm = context.resources.displayMetrics
-        var w = wm.desiredMinimumWidth
-        var h = wm.desiredMinimumHeight
-        if (w <= 0) w = dm.widthPixels
-        if (h <= 0) h = dm.heightPixels
-        w = max(w, dm.widthPixels)
-        h = max(h, dm.heightPixels)
-        // 高分辨率机型（如红米 Turbo）壁纸缓冲区常大于屏幕像素。
-        if (RomPermissionUtils.isDomesticRom()) {
-            w = max(w, 1440)
-            h = max(h, 3200)
+        var w = dm.widthPixels
+        var h = dm.heightPixels
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                val bounds = context.getSystemService(WindowManager::class.java)
+                    ?.currentWindowMetrics
+                    ?.bounds
+                if (bounds != null && bounds.width() > 0 && bounds.height() > 0) {
+                    w = bounds.width()
+                    h = bounds.height()
+                }
+            } catch (_: Exception) {
+            }
         }
-        return w.coerceAtLeast(720) to h.coerceAtLeast(1280)
+        // 保持比例，最长边不超过 2560，兼顾清晰度与内存
+        val longest = max(w, h).coerceAtLeast(1)
+        if (longest > 2560) {
+            val scale = 2560f / longest
+            w = (w * scale).roundToInt().coerceAtLeast(1)
+            h = (h * scale).roundToInt().coerceAtLeast(1)
+        }
+        // 过小则等比放大，勿分别 coerce 破坏宽高比
+        val minW = 720
+        val minH = 1280
+        if (w < minW || h < minH) {
+            val up = max(minW.toFloat() / w, minH.toFloat() / h)
+            w = (w * up).roundToInt()
+            h = (h * up).roundToInt()
+        }
+        return w to h
     }
 
     private fun wallpaperFlags(): Int {
@@ -324,12 +350,50 @@ object QueenWallpaper {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        return BitmapFactory.decodeByteArray(
+        val decoded = BitmapFactory.decodeByteArray(
             bytes,
             0,
             bytes.size,
             decodeOptionsForWallpaper(bounds, targetW, targetH),
-        )
+        ) ?: return null
+        return applyExifOrientation(bytes, decoded)
+    }
+
+    /** 手机拍摄的 JPEG 常靠 EXIF 标记方向，解码时不转会导致壁纸横竖/裁切全错。 */
+    private fun applyExifOrientation(bytes: ByteArray, bitmap: Bitmap): Bitmap {
+        val orientation = try {
+            ExifInterface(ByteArrayInputStream(bytes)).getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL,
+            )
+        } catch (_: Exception) {
+            ExifInterface.ORIENTATION_NORMAL
+        }
+        val matrix = Matrix()
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.preScale(-1f, 1f)
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.preScale(1f, -1f)
+            ExifInterface.ORIENTATION_TRANSPOSE -> {
+                matrix.postRotate(90f)
+                matrix.preScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_TRANSVERSE -> {
+                matrix.postRotate(270f)
+                matrix.preScale(-1f, 1f)
+            }
+            else -> return bitmap
+        }
+        return try {
+            val out = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            if (out !== bitmap) recycleQuietly(bitmap)
+            out
+        } catch (e: Exception) {
+            Log.w(TAG, "exif rotate failed", e)
+            bitmap
+        }
     }
 
     private fun decodeResourceForWallpaper(
@@ -377,9 +441,9 @@ object QueenWallpaper {
         val scale = max(
             targetW.toFloat() / source.width.toFloat(),
             targetH.toFloat() / source.height.toFloat(),
-        ).coerceAtLeast(1f)
-        val scaledW = (source.width * scale).toInt().coerceAtLeast(1)
-        val scaledH = (source.height * scale).toInt().coerceAtLeast(1)
+        )
+        val scaledW = (source.width * scale).roundToInt().coerceAtLeast(1)
+        val scaledH = (source.height * scale).roundToInt().coerceAtLeast(1)
         val scaled = if (scale == 1f && source.width == targetW && source.height == targetH) {
             source.copy(Bitmap.Config.ARGB_8888, false) ?: source
         } else {
