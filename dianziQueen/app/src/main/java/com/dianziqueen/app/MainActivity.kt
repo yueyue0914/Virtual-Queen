@@ -861,7 +861,7 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * 按固定顺序检查并引导下一项缺失权限（未激活/已激活共用）。
-     * 日历 → 系统设置 → 设备管理员 → 无障碍 → 通知 → 通知监听 → 相机 → 壁纸 → 电池 → 蓝牙 → 存储 → 悬浮窗
+     * 日历 → 系统设置 → 电池优化 → 悬浮窗 → 设备管理员 → 无障碍 → 通知 → …
      *
      * @param force true 时忽略冷却（用户点击「去开启下一项」）
      */
@@ -877,6 +877,14 @@ class MainActivity : AppCompatActivity() {
                 }
                 QueenPrivilegeAuditor.Privilege.WRITE_SETTINGS -> {
                     requestWriteSettings()
+                    return
+                }
+                QueenPrivilegeAuditor.Privilege.BATTERY -> {
+                    requestBatteryOptimization()
+                    return
+                }
+                QueenPrivilegeAuditor.Privilege.OVERLAY -> {
+                    requestOverlayPermission()
                     return
                 }
                 QueenPrivilegeAuditor.Privilege.DEVICE_ADMIN -> {
@@ -903,20 +911,12 @@ class MainActivity : AppCompatActivity() {
                     requestWallpaperReady()
                     return
                 }
-                QueenPrivilegeAuditor.Privilege.BATTERY -> {
-                    requestBatteryOptimization()
-                    return
-                }
                 QueenPrivilegeAuditor.Privilege.BLUETOOTH -> {
                     requestBluetoothConnect()
                     return
                 }
                 QueenPrivilegeAuditor.Privilege.STORAGE -> {
                     requestStoragePermission()
-                    return
-                }
-                QueenPrivilegeAuditor.Privilege.OVERLAY -> {
-                    requestOverlayPermission()
                     return
                 }
             }

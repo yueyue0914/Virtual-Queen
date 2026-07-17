@@ -3,6 +3,7 @@ package com.dianziqueen.app
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.PixelFormat
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
@@ -71,6 +72,7 @@ object QueenFloatingOverlay {
     private var touchStartRawX = 0f
     private var touchStartRawY = 0f
     private var dragging = false
+    private var pointerDownOnAvatar = false
     private var menuCompanionHidden = false
 
     private val prefs
@@ -101,6 +103,10 @@ object QueenFloatingOverlay {
 
     fun isShowing(): Boolean = overlayVisible
 
+    fun isAttached(): Boolean = rootView?.isAttachedToWindow == true
+
+    fun applicationContextOrNull(): Context? = appContext
+
     fun isActivated(context: Context): Boolean =
         context.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
             .getBoolean(Prefs.ACTIVATED, false)
@@ -111,7 +117,7 @@ object QueenFloatingOverlay {
             hide()
             return
         }
-        if (!FloatingWindowPermissionHelper.hasPermission(appContext!!)) {
+        if (!PermissionChecker.hasOverlay(appContext!!)) {
             hide()
             return
         }
@@ -144,24 +150,11 @@ object QueenFloatingOverlay {
             applyAvatarSizeCaps(avatar)
             currentMood.applyAvatar(avatar, avatarStyle())
             menu.visibility = View.GONE
-            setupAvatarTouch(avatar, wm, root)
+            setupAdvancedDragging(root, avatar, wm)
             refreshHonorificLabels()
 
-            val type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            val params = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                type,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                PixelFormat.TRANSLUCENT,
-            ).apply {
-                gravity = Gravity.TOP or Gravity.START
-                val (x, y) = loadSavedPosition()
-                this.x = x
-                this.y = y
-            }
+            val (x, y) = loadSavedPosition()
+            val params = createOverlayLayoutParams(x, y)
 
             wm.addView(root, params)
             rootViewRef = WeakReference(root)
@@ -183,9 +176,22 @@ object QueenFloatingOverlay {
                 applyBubblePlacement(forceRelayout = true)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            QueenLogger.e("FloatOverlay", "ensureShown failed", e)
             hide()
         }
+    }
+
+    /** 被 MIUI 等摘掉后由 [QueenFloatingWindow] 看门狗调用，尝试重新挂载。 */
+    fun reattachIfNeeded() {
+        if (!isActivated()) {
+            hide()
+            return
+        }
+        val app = appContext ?: return
+        if (!PermissionChecker.hasOverlay(app)) return
+        if (overlayVisible && rootView?.isAttachedToWindow == true) return
+        overlayVisible = false
+        ensureShown(app)
     }
 
     fun hide() {
@@ -205,7 +211,7 @@ object QueenFloatingOverlay {
                 } catch (_: Exception) { }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            QueenLogger.w("FloatOverlay", "hide removeView failed", e)
         } finally {
             rootViewRef = WeakReference(null)
             layoutParams = null
@@ -263,15 +269,45 @@ object QueenFloatingOverlay {
         refreshWindowLayout()
     }
 
+    private fun createOverlayLayoutParams(x: Int, y: Int): WindowManager.LayoutParams {
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
+        return WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            type,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            this.x = x
+            this.y = y
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+    }
+
     @SuppressLint("ClickableViewAccessibility")
-    private fun setupAvatarTouch(avatar: ImageView, wm: WindowManager, root: View) {
+    private fun setupAdvancedDragging(root: View, avatar: ImageView, wm: WindowManager) {
+        avatar.isClickable = false
+        avatar.isFocusable = false
         avatar.setOnClickListener {
             appContext?.let { ctx ->
                 QueenVibratorHelper.lightTap(ctx)
                 QueenMenuDialog.show(ctx, ::showTaunt)
             }
         }
-        avatar.setOnTouchListener { v, event ->
+        root.isClickable = true
+        root.setOnTouchListener { _, event ->
             val params = layoutParams ?: return@setOnTouchListener false
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
@@ -280,6 +316,7 @@ object QueenFloatingOverlay {
                     dragStartY = params.y
                     touchStartRawX = event.rawX
                     touchStartRawY = event.rawY
+                    pointerDownOnAvatar = isTouchOnAvatar(avatar, event)
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -303,20 +340,43 @@ object QueenFloatingOverlay {
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     if (dragging) {
+                        snapToNearestEdge(params)
                         savePosition(params.x, params.y)
                         handler.post {
                             applyBubblePlacement()
                             refreshWindowLayout()
                         }
-                    } else {
-                        v.performClick()
+                    } else if (pointerDownOnAvatar) {
+                        avatar.performClick()
                     }
                     dragging = false
+                    pointerDownOnAvatar = false
                     true
                 }
                 else -> false
             }
         }
+    }
+
+    private fun isTouchOnAvatar(avatar: ImageView, event: MotionEvent): Boolean {
+        val loc = IntArray(2)
+        avatar.getLocationOnScreen(loc)
+        return event.rawX >= loc[0] && event.rawX <= loc[0] + avatar.width &&
+            event.rawY >= loc[1] && event.rawY <= loc[1] + avatar.height
+    }
+
+    /** 松手后吸附到左右边缘，减少 MIUI 误触遮挡。 */
+    private fun snapToNearestEdge(params: WindowManager.LayoutParams) {
+        val dm = appContext?.resources?.displayMetrics ?: return
+        val (windowW, _) = currentWindowContentSize()
+        val margin = (16 * dm.density).toInt()
+        val centerX = params.x + windowW / 2
+        params.x = if (centerX < dm.widthPixels / 2) {
+            margin
+        } else {
+            (dm.widthPixels - windowW - margin).coerceAtLeast(margin)
+        }
+        clampToScreen(params)
     }
 
     fun showTaunt(mood: QueenFloatingMood, text: String) {

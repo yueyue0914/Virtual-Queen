@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.util.Log
 
 /**
  * 最强控制：权限已全部就绪且已上交后，拦截进入系统设置（含设备管理员/应用详情等）。
@@ -12,7 +11,7 @@ import android.util.Log
  */
 object SettingsLockGuard {
 
-    private const val TAG = "SettingsLockGuard"
+    private const val TAG = "SettingsLock"
     /** 同一设置页内 CONTENT_CHANGED 洪泛去重（不影响用户再次点开设置）。 */
     private const val CONTENT_FLOOD_DEBOUNCE_MS = 500L
     /** Queen 消息写入间隔，避免连点刷屏。 */
@@ -63,7 +62,7 @@ object SettingsLockGuard {
         pendingOverlayRunnable?.let { handler.removeCallbacks(it) }
         pendingOverlayRunnable = null
         SettingsBlockOverlay.hide()
-        Log.i(TAG, "all intercept blocks released")
+        QueenLogger.i(TAG, "all intercept blocks released")
     }
 
     private fun isUserOptedOut(context: Context): Boolean =
@@ -256,7 +255,7 @@ object SettingsLockGuard {
             if (now - lastContentBlockMs < CONTENT_FLOOD_DEBOUNCE_MS) return
         }
         lastContentBlockMs = now
-        Log.w(TAG, "blocked system settings entry: $source (state=$fromWindowStateChange)")
+        QueenLogger.w(TAG, "blocked system settings entry: $source (state=$fromWindowStateChange)")
 
         val app = context.applicationContext
         QueenVibratorHelper.punish(app)
@@ -270,7 +269,7 @@ object SettingsLockGuard {
             if (SettingsBlockOverlay.isVisible()) {
                 SettingsBlockOverlay.refreshAutoHide(10_000L)
             } else if (!SettingsBlockOverlay.show(app, title, body, autoFinishMs = 10_000L)) {
-                Log.w(TAG, "SettingsBlockOverlay.show failed (no overlay permission?)")
+                QueenLogger.w(TAG, "SettingsBlockOverlay.show failed (no overlay permission?)")
             }
         }
         pendingOverlayRunnable = overlayTask

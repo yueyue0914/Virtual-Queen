@@ -3,7 +3,6 @@ package com.dianziqueen.app
 import android.content.Context
 import android.graphics.PixelFormat
 import android.os.Build
-import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -19,7 +18,7 @@ import java.lang.ref.WeakReference
  */
 object QueenMenuDialog {
 
-    private const val TAG = "QueenMenuDialog"
+    private const val TAG = "MenuDialog"
 
     private var dialogRootRef = WeakReference<View>(null)
     private var windowManager: WindowManager? = null
@@ -34,10 +33,10 @@ object QueenMenuDialog {
             bringToFront()
             return
         }
-        if (!FloatingWindowPermissionHelper.hasPermission(context)) return
+        if (!PermissionChecker.hasOverlay(context)) return
         val app = context.applicationContext
-        try {
-            val wm = ContextCompat.getSystemService(app, WindowManager::class.java) ?: return
+        val ok = runCatchingQueen(TAG, "show menu") {
+            val wm = ContextCompat.getSystemService(app, WindowManager::class.java) ?: return@runCatchingQueen
             val inflateParent = FrameLayout(app)
             val root = LayoutInflater.from(app)
                 .inflate(R.layout.dialog_queen_float_menu, inflateParent, false)
@@ -52,7 +51,8 @@ object QueenMenuDialog {
                 type,
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                     WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
                 PixelFormat.TRANSLUCENT,
             )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -70,27 +70,22 @@ object QueenMenuDialog {
                 root.requestFocus()
                 bringToFront()
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "show failed", e)
-            dismiss()
         }
+        if (!ok) dismiss()
     }
 
     fun dismiss() {
-        try {
+        runCatchingQueen(TAG, "dismiss menu") {
             val wm = windowManager
             val view = dialogRoot
             if (wm != null && view != null && view.isAttachedToWindow) {
                 wm.removeView(view)
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "dismiss removeView failed", e)
-        } finally {
-            dialogRootRef = WeakReference(null)
-            windowManager = null
-            layoutParams = null
-            QueenFloatingOverlay.onMenuClosed()
         }
+        dialogRootRef = WeakReference(null)
+        windowManager = null
+        layoutParams = null
+        QueenFloatingOverlay.onMenuClosed()
     }
 
     /** 部分 ROM 会在其它悬浮窗 updateViewLayout 后把菜单压到下层，需重新置顶。 */
@@ -99,10 +94,8 @@ object QueenMenuDialog {
         val view = dialogRoot ?: return
         val params = layoutParams ?: return
         if (!view.isAttachedToWindow) return
-        try {
+        runCatchingQueen(TAG, "bringToFront") {
             wm.updateViewLayout(view, params)
-        } catch (e: Exception) {
-            Log.w(TAG, "bringToFront failed", e)
         }
     }
 

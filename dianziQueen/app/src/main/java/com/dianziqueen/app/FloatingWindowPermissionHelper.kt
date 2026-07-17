@@ -6,8 +6,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import android.util.Log
-import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
@@ -16,7 +14,7 @@ import androidx.appcompat.app.AppCompatActivity
  */
 object FloatingWindowPermissionHelper {
 
-    private const val TAG = "FloatingWindowPerm"
+    private const val TAG = "OverlayPerm"
     private const val PREF_OVERLAY_GUIDE_LAST_MS = "queen_overlay_guide_last_ms"
     private const val OVERLAY_GUIDE_COOLDOWN_MS = 6 * 60 * 60 * 1000L
 
@@ -42,7 +40,7 @@ object FloatingWindowPermissionHelper {
     }
 
     fun openOverlaySettings(context: Context) {
-        try {
+        runCatchingQueen(TAG, "openOverlaySettings") {
             val intent = Intent(
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                 Uri.parse("package:${context.packageName}"),
@@ -52,8 +50,6 @@ object FloatingWindowPermissionHelper {
                 }
             }
             context.startActivity(intent)
-        } catch (e: Exception) {
-            Log.e(TAG, "openOverlaySettings failed", e)
         }
     }
 
@@ -142,7 +138,7 @@ object FloatingWindowPermissionHelper {
                 tryOpenXiaomiExtraSettings(activity)
             }
             .setNegativeButton(R.string.overlay_xiaomi_guide_later) { _, _ ->
-                Toast.makeText(activity, activity.hon(R.string.overlay_xiaomi_guide_later_toast), Toast.LENGTH_LONG).show()
+                activity.toastLong(activity.hon(R.string.overlay_xiaomi_guide_later_toast))
             }
             .setCancelable(false)
             .show()
@@ -151,7 +147,7 @@ object FloatingWindowPermissionHelper {
     /** 通用检查 + 引导（自检按钮、权限流程可调用）。 */
     fun checkAndRequest(activity: AppCompatActivity) {
         if (hasPermission(activity)) {
-            Toast.makeText(activity, activity.hon(R.string.overlay_already_granted), Toast.LENGTH_SHORT).show()
+            activity.toastShort(activity.hon(R.string.overlay_already_granted))
             QueenService.start(activity)
             return
         }

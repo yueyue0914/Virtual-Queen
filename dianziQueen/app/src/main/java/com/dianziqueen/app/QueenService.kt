@@ -360,6 +360,13 @@ class QueenService : Service() {
         fakeCamera = FakeCameraIndicator(this)
         imageGen = TeasingImageGenerator(this)
         QueenKeepAlive.onServiceStarted(this)
+        handler.post {
+            if (isActivated()) {
+                QueenFloatingWindow.ensureShown(this)
+                QueenFloatingWindow.startHealthWatch()
+                maybeRequestBatteryExemptionOnce()
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -404,6 +411,7 @@ class QueenService : Service() {
         releaseWallpaperChangeMonitor()
         CalendarInjector.unregisterDeletionWatch(this)
         fakeCamera.hideDot()
+        QueenFloatingWindow.stopHealthWatch()
         QueenFloatingWindow.hide()
         if (isActivated()) {
             QueenKeepAlive.requestDelayedRestart(applicationContext, "onDestroy")
@@ -470,6 +478,7 @@ class QueenService : Service() {
 
     /**
      * 激活后首次启动服务时尝试弹出系统「忽略电池优化」（仅一次；失败则靠定时通知引导）。
+     * 优先使用 [QueenBatteryHelper.openBatteryExemptionRequest] 直接弹系统对话框。
      */
     private fun maybeRequestBatteryExemptionOnce() {
         if (!isActivated()) return
@@ -479,9 +488,11 @@ class QueenService : Service() {
         prefs.edit().putBoolean(Prefs.BATTERY_EXEMPTION_SERVICE_PROMPTED, true).apply()
         handler.postDelayed({
             try {
-                QueenBatteryHelper.openBatteryExemptionSettings(this)
+                if (!QueenBatteryHelper.openBatteryExemptionRequest(this)) {
+                    QueenBatteryHelper.openBatteryExemptionSettings(this)
+                }
             } catch (_: Exception) { }
-        }, 2_500L)
+        }, 1_500L)
     }
 
     private fun scheduleAll() {

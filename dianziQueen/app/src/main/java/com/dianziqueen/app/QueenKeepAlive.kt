@@ -11,7 +11,6 @@ import android.content.Context
 import android.content.Intent
 
 import android.os.Build
-import android.util.Log
 import androidx.core.app.NotificationCompat
 
 import androidx.core.app.NotificationManagerCompat
@@ -192,7 +191,7 @@ object QueenKeepAlive {
 
         if (!QueenService.isAlive()) {
 
-            Log.w(TAG, "QueenService not alive, restarting foreground service")
+            QueenLogger.w(TAG, "QueenService not alive, restarting foreground service")
 
             try {
 
@@ -200,7 +199,7 @@ object QueenKeepAlive {
 
             } catch (e: Exception) {
 
-                Log.e(TAG, "start QueenService failed", e)
+                QueenLogger.e(TAG, "start QueenService failed", e)
 
             }
 
@@ -254,7 +253,7 @@ object QueenKeepAlive {
 
             .apply()
 
-        Log.w(TAG, "recordDeath streak=$streak reason=$reason")
+        QueenLogger.w(TAG, "recordDeath streak=$streak reason=$reason")
 
     }
 
@@ -282,7 +281,7 @@ object QueenKeepAlive {
 
         recordDeath(app, reason)
 
-        Log.w(TAG, "requestDelayedRestart: $reason")
+        QueenLogger.w(TAG, "requestDelayedRestart: $reason")
 
         try {
 
@@ -456,7 +455,7 @@ object QueenKeepAlive {
 
         } catch (e: SecurityException) {
 
-            Log.w(TAG, "exact alarm denied, fallback: ${e.message}")
+            QueenLogger.w(TAG, "exact alarm denied, fallback: ${e.message}")
 
             try {
 
@@ -464,13 +463,13 @@ object QueenKeepAlive {
 
             } catch (e2: Exception) {
 
-                Log.w(TAG, "fallback alarm failed: ${e2.message}")
+                QueenLogger.w(TAG, "fallback alarm failed: ${e2.message}")
 
             }
 
         } catch (e: Exception) {
 
-            Log.w(TAG, "scheduleWakeAlarm failed: ${e.message}")
+            QueenLogger.w(TAG, "scheduleWakeAlarm failed: ${e.message}")
 
         }
 

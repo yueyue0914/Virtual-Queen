@@ -5,21 +5,16 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.util.Log
-import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import java.io.File
 
 /**
- * 反卸载多层防御：
- * 1. 心理威慑 — 分级弹窗 + 全屏 [UninstallThreatActivity]
- * 2. 技术阻拦 — 无障碍检测卸载页 + 设备管理员 + 按 Home 打断
- * 3. 卸载后惩罚 — 外部档案留存反抗次数，重装/开机追罚
+ * Anti-uninstall multilayer defense (threat UI + accessibility + external record).
  */
 object UninstallGuard {
 
-    private const val TAG = "UninstallGuard"
+    private const val TAG = "Uninstall"
     private const val GUARD_DIR_NAME = "Dianzinvwang"
     private const val GUARD_STATE_FILE = "queen_uninstall_guard.state"
     private const val DEBOUNCE_MS = 8_000L
@@ -43,7 +38,7 @@ object UninstallGuard {
         }
         saveProtectedState(app, true)
         writeExternalState(app, rebellionCount = loadRebellionCount(app), protected = true)
-        Log.i(TAG, "卸载保护已启用")
+        QueenLogger.i(TAG, "卸载保护已启用")
     }
 
     fun disableProtection(context: Context) {
@@ -70,7 +65,7 @@ object UninstallGuard {
             .putInt(Prefs.REBELLION_COUNT, rebellion)
             .putBoolean(Prefs.HEAVY_PUNISHMENT_PENDING, true)
             .apply()
-        Log.i(TAG, "detected prior rebellion=$rebellion from external guard file")
+        QueenLogger.i(TAG, "detected prior rebellion=$rebellion from external guard file")
     }
 
     /**
@@ -147,7 +142,7 @@ object UninstallGuard {
             .putLong(Prefs.LAST_UNINSTALL_ATTEMPT_AT, System.currentTimeMillis())
             .apply()
         writeExternalState(app, rebellion, protected = true)
-        Log.w(TAG, "uninstall attempt via $source, rebellion=$rebellion")
+        QueenLogger.w(TAG, "uninstall attempt via $source, rebellion=$rebellion")
 
         QueenVibratorHelper.punish(app)
         if (rebellion >= MAX_REBELLION_COUNT) {
@@ -157,11 +152,11 @@ object UninstallGuard {
             dismissUninstallUi()
         }
 
-        if (rebellion >= 2 && QueenWallpaperHelper.hasSetWallpaperPermission(app)) {
+        if (rebellion >= 2 && PermissionChecker.hasWallpaper(app)) {
             try {
                 QueenWallpaper.forceQueenWallpaper(app)
             } catch (e: Exception) {
-                Log.w(TAG, "threat wallpaper failed: ${e.message}")
+                QueenLogger.w(TAG, "threat wallpaper failed: ${e.message}")
             }
         }
 
@@ -205,7 +200,7 @@ object UninstallGuard {
         if (!isProtectionEnabled(app)) return
         val rebellion = recordRebellion(app)
         writeExternalState(app, rebellion, protected = true)
-        Log.w(TAG, "unauthorized device admin disable, rebellion=$rebellion")
+        QueenLogger.w(TAG, "unauthorized device admin disable, rebellion=$rebellion")
         QueenVibratorHelper.punish(app)
         QueenMessageStore.appendQueenMessage(
             app,
@@ -239,7 +234,7 @@ object UninstallGuard {
             }
             context.startActivity(intent)
         } catch (e: Exception) {
-            Log.e(TAG, "launchPinGate failed", e)
+            QueenLogger.e(TAG, "launchPinGate failed", e)
         }
     }
 
@@ -262,11 +257,7 @@ object UninstallGuard {
             .setMessage(message)
             .setPositiveButton(activity.hon(R.string.uninstall_guard_stay)) { _, _ ->
                 dismissUninstallUi()
-                Toast.makeText(
-                    activity,
-                    activity.hon(R.string.uninstall_guard_stay_toast),
-                    Toast.LENGTH_SHORT,
-                ).show()
+                                activity.toastShort(activity.hon(R.string.uninstall_guard_stay_toast))
             }
             .setNegativeButton(activity.hon(R.string.uninstall_guard_continue)) { _, _ ->
                 launchPinGate(
@@ -307,7 +298,7 @@ object UninstallGuard {
             }
             context.startActivity(intent)
         } catch (e: Exception) {
-            Log.e(TAG, "startThreatActivity failed", e)
+            QueenLogger.e(TAG, "startThreatActivity failed", e)
         }
     }
 
@@ -357,7 +348,7 @@ object UninstallGuard {
             val file = guardStateFile(context) ?: return
             file.writeText("rebellion=$rebellionCount\nprotected=$protected\nupdated=${System.currentTimeMillis()}\n")
         } catch (e: Exception) {
-            Log.w(TAG, "writeExternalState failed: ${e.message}")
+            QueenLogger.w(TAG, "writeExternalState failed: ${e.message}")
         }
     }
 

@@ -4,11 +4,10 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 
 object QueenDeviceAdminHelper {
 
-    private const val TAG = "QueenDeviceAdminHelper"
+    private const val TAG = "DeviceAdmin"
 
     /** 停用管理员 / 坚持卸载须输入的 Queen PIN（固定，App 不代为设置系统锁屏）。 */
     const val ADMIN_DISABLE_PIN = "20262026"
@@ -68,7 +67,7 @@ object QueenDeviceAdminHelper {
                 (dpm.isDeviceOwnerApp(pkg) || dpm.isProfileOwnerApp(pkg))
             ownerCapabilityProbed = true
             if (!hasDpmOwnerCapability) {
-                Log.i(TAG, "非 Device/Profile Owner，跳过 setStatusBarDisabled 等高级 DPM API")
+                QueenLogger.i(TAG, "非 Device/Profile Owner，跳过 setStatusBarDisabled 等高级 DPM API")
             }
         }
         return hasDpmOwnerCapability
@@ -93,9 +92,9 @@ object QueenDeviceAdminHelper {
         } catch (e: SecurityException) {
             hasDpmOwnerCapability = false
             ownerCapabilityProbed = true
-            Log.w(TAG, "DPM Owner API 不可用，已永久跳过: ${e.message}")
+            QueenLogger.w(TAG, "DPM Owner API 不可用，已永久跳过: ${e.message}", e)
         } catch (e: Exception) {
-            Log.d(TAG, "setConstraintsDisabled failed: ${e.message}")
+            QueenLogger.d(TAG, "setConstraintsDisabled failed: ${e.message}")
         }
     }
 
