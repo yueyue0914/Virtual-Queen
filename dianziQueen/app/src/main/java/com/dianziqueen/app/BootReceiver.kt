@@ -52,6 +52,10 @@ object Prefs {
     const val QUEEN_FLOAT_Y = "queen_float_y"
     /** 悬浮头像样式：default | custom */
     const val QUEEN_FLOAT_AVATAR_STYLE = "queen_float_avatar_style"
+    /** 悬浮头像边长（dp），默认 36。 */
+    const val QUEEN_FLOAT_AVATAR_SIZE_DP = "queen_float_avatar_size_dp"
+    /** 下次轮换壁纸是否优先 App 相册（与 raw 交替；无相册图时不使用）。 */
+    const val QUEEN_WALLPAPER_NEXT_VAULT = "queen_wallpaper_next_vault"
     /** 反卸载保护是否已启用（激活后默认 true）。 */
     const val UNINSTALL_PROTECTED = "uninstall_protected"
     /** 卸载/停用管理员等反抗次数。 */

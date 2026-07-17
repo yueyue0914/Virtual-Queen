@@ -9,97 +9,176 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Shader
 import android.os.Build
+import android.util.Log
+import kotlin.math.max
 import kotlin.random.Random
 
 object QueenWallpaper {
 
-    /** 与原版一致：raw 命名为 wallpaper_1、wallpaper_2 …（文件名如 wallpaper_3.png） */
-    private const val RAW_WALLPAPER_PREFIX = "wallpaper_"
-    private const val RAW_WALLPAPER_INDEX_MAX = 99
+    private const val TAG = "QueenWallpaper"
 
-    fun collectRawWallpaperIds(context: Context): List<Int> {
-        val res = context.resources
-        val pkg = context.packageName
-        return (1..RAW_WALLPAPER_INDEX_MAX).mapNotNull { i ->
-            val id = res.getIdentifier("$RAW_WALLPAPER_PREFIX$i", "raw", pkg)
-            if (id != 0) id else null
-        }
+    /** 与 res/raw 中 wallpaper_1 … wallpaper_42 对应。 */
+    fun collectRawWallpaperIds(): List<Int> =
+        QueenRawAssets.wallpaperIds.toList()
+
+    /** 可用于壁纸的 App 相册 id（未赎回）。 */
+    fun listWallpaperVaultPhotoIds(context: Context): List<String> {
+        if (!QueenAlbumVault.hasMasterKey(context)) return emptyList()
+        return QueenAlbumVault.listPhotoIds(context)
+            .filterNot { QueenAlbumVault.isRedeemed(context, it) }
     }
 
     /**
-     * 从 [res/raw] 中随机选一张设为系统壁纸（优先 setStream，失败则 decode + setBitmap）。
-     * @return 是否成功使用 raw 资源；若 raw 列表为空则为 false，可再调用 [randomWallpaper]+[applyWallpaper] 作回退。
+     * 按轮换规则换下一张壁纸：有 App 相册图时「相册 → raw → 相册 → raw…」交替；
+     * 无相册图时仅从 [res/raw] 随机（失败则程序生成）。
      */
+    fun applyNextQueenWallpaper(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+        val hasVault = listWallpaperVaultPhotoIds(context).isNotEmpty()
+        val useVault = hasVault && prefs.getBoolean(Prefs.QUEEN_WALLPAPER_NEXT_VAULT, true)
+
+        val ok = when {
+            useVault -> applyRandomWallpaperFromVault(context) ||
+                applyRandomWallpaperFromRaw(context) ||
+                applyGeneratedWallpaper(context)
+            else -> applyRandomWallpaperFromRaw(context) ||
+                (hasVault && applyRandomWallpaperFromVault(context)) ||
+                applyGeneratedWallpaper(context)
+        }
+
+        if (ok && hasVault) {
+            prefs.edit()
+                .putBoolean(Prefs.QUEEN_WALLPAPER_NEXT_VAULT, !useVault)
+                .apply()
+        }
+        if (!ok) {
+            Log.w(TAG, "applyNextQueenWallpaper: all sources failed")
+        }
+        return ok
+    }
+
+    private fun applyGeneratedWallpaper(context: Context): Boolean {
+        val (w, h) = wallpaperTargetSize(context)
+        var bmp: Bitmap? = null
+        return try {
+            bmp = randomWallpaper(w, h)
+            applyWallpaper(context, bmp)
+        } catch (e: Exception) {
+            Log.w(TAG, "generated wallpaper failed", e)
+            false
+        } finally {
+            bmp?.let { recycleQuietly(it) }
+        }
+    }
+
+    fun applyRandomWallpaperFromVault(context: Context): Boolean {
+        val ids = listWallpaperVaultPhotoIds(context)
+        if (ids.isEmpty()) return false
+        for (photoId in ids.shuffled()) {
+            var bmp: Bitmap? = null
+            try {
+                bmp = decodeVaultPhotoForWallpaper(context, photoId) ?: continue
+                if (applyWallpaper(context, bmp)) {
+                    Log.i(TAG, "vault wallpaper applied: $photoId")
+                    return true
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "vault wallpaper failed: $photoId", e)
+            } finally {
+                bmp?.let { recycleQuietly(it) }
+            }
+        }
+        return false
+    }
+
+    private fun decodeVaultPhotoForWallpaper(context: Context, photoId: String): Bitmap? {
+        val plain = QueenAlbumVault.decryptToBytes(context, photoId) ?: return null
+        val (targetW, targetH) = wallpaperTargetSize(context)
+        return decodeBytesForWallpaper(plain, targetW, targetH)
+    }
+
     fun applyRandomWallpaperFromRaw(context: Context): Boolean {
-        val ids = collectRawWallpaperIds(context)
+        val ids = collectRawWallpaperIds()
         if (ids.isEmpty()) return false
         val resId = ids.random()
-        val wm = WallpaperManager.getInstance(context)
         val res = context.resources
 
-        try {
-            res.openRawResource(resId).use { input ->
-                if (trySetWallpaperStream(wm, input)) return true
+        // 华米 OV / HyperOS 上 setStream 常出现「设置成功但显示纯黑」，统一走 Bitmap。
+        if (!RomPermissionUtils.isDomesticRom()) {
+            try {
+                res.openRawResource(resId).use { input ->
+                    if (trySetWallpaperStream(context, input)) {
+                        Log.i(TAG, "raw stream wallpaper applied: $resId")
+                        return true
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "raw stream failed: $resId", e)
             }
-        } catch (_: Exception) { }
+        }
 
         var bmp: Bitmap? = null
         return try {
-            bmp = BitmapFactory.decodeResource(res, resId) ?: return false
-            applyWallpaper(context, bmp)
-            true
-        } catch (_: Exception) {
+            val (targetW, targetH) = wallpaperTargetSize(context)
+            val decoded = BitmapFactory.decodeResource(res, resId) ?: return false
+            bmp = decoded
+            if (applyWallpaper(context, decoded)) {
+                Log.i(TAG, "raw bitmap wallpaper applied: $resId (${targetW}x$targetH)")
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "raw bitmap failed: $resId", e)
             false
         } finally {
-            bmp?.recycle()
+            bmp?.let { recycleQuietly(it) }
         }
     }
 
-    private fun trySetWallpaperStream(wm: WallpaperManager, input: java.io.InputStream): Boolean {
+    private fun trySetWallpaperStream(context: Context, input: java.io.InputStream): Boolean {
+        val wm = WallpaperManager.getInstance(context)
         return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                wm.setStream(input, null, true, WallpaperManager.FLAG_SYSTEM)
-            } else {
-                @Suppress("DEPRECATION")
-                wm.setStream(input)
-            }
+            wm.setStream(input, null, true, wallpaperFlags())
             true
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w(TAG, "setStream failed", e)
             false
         }
     }
 
-    /** 无 raw 素材时的程序生成壁纸（渐变 + 文案） */
     fun randomWallpaper(
         width: Int = 1080,
         height: Int = 1920,
-        seed: Long = Random.nextLong()
+        seed: Long = Random.nextLong(),
     ): Bitmap {
+        val w = width.coerceAtLeast(720)
+        val h = height.coerceAtLeast(1280)
         val rnd = Random(seed)
-        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
         val c0 = randomNeon(rnd)
         val c1 = randomNeon(rnd)
         val c2 = randomNeon(rnd)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = LinearGradient(
-                0f, 0f, width.toFloat(), height.toFloat(),
+                0f, 0f, w.toFloat(), h.toFloat(),
                 intArrayOf(c0, c1, c2),
                 floatArrayOf(0f, 0.45f, 1f),
-                Shader.TileMode.CLAMP
+                Shader.TileMode.CLAMP,
             )
         }
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
         val tp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xFFFFFFFF.toInt()
-            textSize = width * 0.08f
+            textSize = w * 0.08f
             textAlign = Paint.Align.CENTER
             setShadowLayer(12f, 0f, 0f, 0xFF000000.toInt())
         }
-        canvas.drawText("电子QUEEN", width / 2f, height * 0.45f, tp)
-        tp.textSize = width * 0.035f
+        canvas.drawText("电子QUEEN", w / 2f, h * 0.45f, tp)
+        tp.textSize = w * 0.035f
         tp.color = 0xCCFFFFFF.toInt()
-        canvas.drawText("DIANZI · SYNC", width / 2f, height * 0.52f, tp)
+        canvas.drawText("DIANZI · SYNC", w / 2f, h * 0.52f, tp)
         return bmp
     }
 
@@ -110,27 +189,42 @@ object QueenWallpaper {
         return android.graphics.Color.HSVToColor(floatArrayOf(h, s, v))
     }
 
-    fun applyWallpaper(context: Context, bitmap: Bitmap) {
+    /** @return 是否已成功写入系统壁纸 */
+    fun applyWallpaper(context: Context, bitmap: Bitmap): Boolean {
+        if (bitmap.isRecycled || bitmap.width <= 0 || bitmap.height <= 0) return false
         val wm = WallpaperManager.getInstance(context)
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                wm.setBitmap(bitmap, null, true, WallpaperManager.FLAG_SYSTEM)
-            } else {
-                @Suppress("DEPRECATION")
-                wm.setBitmap(bitmap)
+        val (targetW, targetH) = wallpaperTargetSize(context)
+        suggestDesiredDimensions(wm, targetW, targetH)
+
+        var prepared: Bitmap? = null
+        return try {
+            prepared = prepareWallpaperBitmap(bitmap, targetW, targetH)
+            if (prepared.isRecycled || prepared.width <= 0 || prepared.height <= 0) {
+                return false
             }
-        } catch (_: Exception) {
             try {
-                wm.setBitmap(bitmap)
-            } catch (_: Exception) { }
+                wm.setBitmap(prepared, null, true, wallpaperFlags())
+                true
+            } catch (e1: Exception) {
+                Log.w(TAG, "setBitmap(flags) failed, retry legacy", e1)
+                try {
+                    @Suppress("DEPRECATION")
+                    wm.setBitmap(prepared)
+                    true
+                } catch (e2: Exception) {
+                    Log.e(TAG, "setBitmap legacy failed", e2)
+                    false
+                }
+            }
+        } finally {
+            if (prepared != null && prepared !== bitmap) {
+                recycleQuietly(prepared)
+            }
         }
     }
 
-    /** 暂时释放：大字壁纸「你自由了，暂时的。」 */
     fun applyTemporaryFreedomWallpaper(context: Context) {
-        val wm = WallpaperManager.getInstance(context)
-        val width = wm.desiredMinimumWidth.coerceAtLeast(720)
-        val height = wm.desiredMinimumHeight.coerceAtLeast(1280)
+        val (width, height) = wallpaperTargetSize(context)
         val bmp = freedomWallpaperBitmap(width, height)
         try {
             context.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
@@ -139,7 +233,7 @@ object QueenWallpaper {
                 .apply()
             applyWallpaper(context, bmp)
         } finally {
-            bmp.recycle()
+            recycleQuietly(bmp)
         }
     }
 
@@ -180,20 +274,113 @@ object QueenWallpaper {
         return bmp
     }
 
-    /** 标记为本应用设置壁纸后，随机 raw 或程序生成并应用（供定时任务与壁纸监听共用）。 */
     fun forceQueenWallpaper(context: Context) {
         try {
             val prefs = context.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
             if (!prefs.getBoolean(Prefs.ACTIVATED, false)) return
             if (!QueenWallpaperHelper.hasSetWallpaperPermission(context)) return
             prefs.edit().putBoolean(Prefs.WE_SET_WALLPAPER, true).apply()
-            if (!applyRandomWallpaperFromRaw(context)) {
-                val bmp = randomWallpaper()
-                applyWallpaper(context, bmp)
-                bmp.recycle()
-            }
+            applyNextQueenWallpaper(context)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "forceQueenWallpaper failed", e)
+        }
+    }
+
+    private fun wallpaperTargetSize(context: Context): Pair<Int, Int> {
+        val wm = WallpaperManager.getInstance(context)
+        val dm = context.resources.displayMetrics
+        var w = wm.desiredMinimumWidth
+        var h = wm.desiredMinimumHeight
+        if (w <= 0) w = dm.widthPixels
+        if (h <= 0) h = dm.heightPixels
+        w = max(w, dm.widthPixels)
+        h = max(h, dm.heightPixels)
+        // 高分辨率机型（如红米 Turbo）壁纸缓冲区常大于屏幕像素。
+        if (RomPermissionUtils.isDomesticRom()) {
+            w = max(w, 1440)
+            h = max(h, 3200)
+        }
+        return w.coerceAtLeast(720) to h.coerceAtLeast(1280)
+    }
+
+    private fun wallpaperFlags(): Int {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK
+        } else {
+            @Suppress("DEPRECATION")
+            WallpaperManager.FLAG_SYSTEM
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun suggestDesiredDimensions(wm: WallpaperManager, width: Int, height: Int) {
+        try {
+            wm.suggestDesiredDimensions(width, height)
+        } catch (e: Exception) {
+            Log.d(TAG, "suggestDesiredDimensions ignored: ${e.message}")
+        }
+    }
+
+    private fun decodeBytesForWallpaper(bytes: ByteArray, targetW: Int, targetH: Int): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sample = 1
+        val maxDim = max(targetW, targetH)
+        while (max(bounds.outWidth / sample, bounds.outHeight / sample) > maxDim * 2) {
+            sample *= 2
+        }
+        return BitmapFactory.decodeByteArray(
+            bytes,
+            0,
+            bytes.size,
+            BitmapFactory.Options().apply {
+                inSampleSize = sample
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            },
+        )
+    }
+
+    /** 居中裁剪/放大到目标分辨率，避免 MIUI 拉伸过小 Bitmap 成黑屏。 */
+    private fun prepareWallpaperBitmap(source: Bitmap, targetW: Int, targetH: Int): Bitmap {
+        if (source.config != Bitmap.Config.ARGB_8888) {
+            val converted = source.copy(Bitmap.Config.ARGB_8888, false)
+            if (converted != null && converted !== source) {
+                val result = prepareWallpaperBitmap(converted, targetW, targetH)
+                recycleQuietly(converted)
+                return result
+            }
+        }
+        val scale = max(
+            targetW.toFloat() / source.width.toFloat(),
+            targetH.toFloat() / source.height.toFloat(),
+        ).coerceAtLeast(1f)
+        val scaledW = (source.width * scale).toInt().coerceAtLeast(1)
+        val scaledH = (source.height * scale).toInt().coerceAtLeast(1)
+        val scaled = if (scale == 1f && source.width == targetW && source.height == targetH) {
+            source.copy(Bitmap.Config.ARGB_8888, false) ?: source
+        } else {
+            Bitmap.createScaledBitmap(source, scaledW, scaledH, true)
+        }
+        if (scaled.width == targetW && scaled.height == targetH) {
+            return scaled
+        }
+        val x = ((scaled.width - targetW) / 2f).coerceAtLeast(0f)
+        val y = ((scaled.height - targetH) / 2f).coerceAtLeast(0f)
+        val out = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(out)
+        canvas.drawBitmap(scaled, -x, -y, null)
+        if (scaled !== source) {
+            recycleQuietly(scaled)
+        }
+        return out
+    }
+
+    private fun recycleQuietly(bitmap: Bitmap) {
+        if (!bitmap.isRecycled) {
+            try {
+                bitmap.recycle()
+            } catch (_: Exception) { }
         }
     }
 }

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="pure_black">#000000</color>
+    <color name="screen_bg">#FF0A0000</color>
     <color name="blood_red">#FF1744</color>
-    <color name="blood_red_dark">#B71C1C</color>
     <color name="crimson_glow">#FF5252</color>
     <color name="red_hint">#66FF1744</color>
     <color name="frame_red">#99E53935</color>
@@ -24,11 +24,6 @@
     <color name="banner_fill_green">#22000000</color>
     <!-- 兼容旧引用 -->
     <color name="queen_bg">#000000</color>
-    <color name="queen_primary">#FF1744</color>
-    <color name="queen_secondary">#FF5252</color>
-    <color name="queen_surface">#1A0D0D</color>
-    <color name="queen_on_surface">#FFCDD2</color>
-    <color name="queen_error">#FF1744</color>
     <color name="takeover_matrix_green">#00FF41</color>
     <color name="takeover_blood_red">#FF0000</color>
 </resources>

@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/pure_black">
+    tools:ignore="MergeRootFrame">
 
     <com.dianziqueen.app.CodeRainView
         android:id="@+id/codeRain"
@@ -250,7 +251,7 @@
                     android:textSize="12sp" />
 
                 <EditText
-                    android:id="@+id/passwordInput"
+                    android:id="@+id/lockCodeInput"
                     android:layout_width="match_parent"
                     android:layout_height="52dp"
                     android:layout_marginTop="12dp"

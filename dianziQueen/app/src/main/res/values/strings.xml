@@ -14,6 +14,7 @@
     <string name="lock_system_online">[ SYSTEM ONLINE ]</string>
     <string name="lock_access_label">&gt; ENTER ACCESS CODE</string>
     <string name="hint_password">输入访问口令</string>
+    <string name="gate_password">我是被控制的贱奴</string>
     <string name="btn_submit">上交权限</string>
     <string name="btn_fix_permissions">去开启下一项</string>
     <string name="btn_support">懒得弄口令？那就去付钱。</string>
@@ -30,10 +31,11 @@
     <string name="battery_notify_title">未允许后台高耗电</string>
     <string name="battery_notify_text">Queen 后台服务可能被系统杀死，点此关闭电池优化</string>
     <string name="battery_notify_big_text">请在下一页选择「允许」「不限制」或「无限制」。小米/红米：应用详情 → 省电策略 → 无限制；并开启自启动。</string>
-    <string name="toast_battery_guide">请选择「允许」忽略电池优化；小米/红米还须：应用详情 → 省电策略 → 无限制</string>
+    <string name="toast_battery_guide">请选择「不优化」，并务必点击右下角「完成」后返回 App</string>
+    <string name="toast_battery_guide_xiaomi_step1">第 1 步：选「不优化」→ 点「完成」。返回后 App 会再引导「省电策略 → 无限制」</string>
+    <string name="toast_battery_guide_xiaomi_step2">第 2 步：应用详情 → 省电策略 → 无限制（仅「不优化」仍会被 MIUI 杀后台）</string>
     <string name="perm_overlay">· 允许显示在其他应用的上层（小米需额外开启悬浮窗/自启动）</string>
     <string name="overlay_guide_title">需要悬浮窗权限</string>
-    <string name="overlay_guide_message_xiaomi">检测到你是小米/红米手机，需要在以下地方都开启权限：\n\n1.「显示在其他应用上方」\n2. 设置 → 应用详情 → 自启动 → 允许\n3. 应用详情 → 省电策略 → 无限制\n4. 其他权限 → 悬浮窗（如有单独入口）\n\nQueen 需要这些权限才能随时出现在你面前。</string>
     <string name="overlay_guide_message_generic">Queen 想要随时出现在你屏幕上持续监视和调教你。\n\n请允许「显示在其他应用上方」权限。</string>
     <string name="overlay_guide_go_settings">去开启</string>
     <string name="overlay_guide_xiaomi_extra">小米权限中心</string>
@@ -98,8 +100,6 @@
     <string name="perm_check_item_write_settings">修改系统设置</string>
     <string name="perm_check_item_battery">电池优化豁免</string>
     <string name="perm_check_item_autostart">自启动管理</string>
-    <string name="keep_alive_notify_title">Queen 已从清理中复活</string>
-    <string name="keep_alive_notify_text">内存清理后已自动拉回 Queen 服务。请在手机管家里把本 App 加白名单并锁定多任务。</string>
     <string name="perm_notification_listener">· 通知监听（女王的耳目）未开启</string>
     <string name="perm_notification_listener_not_running">· 通知监听已开启但未连接：请关闭 Queen 监听开关再重新打开</string>
     <string name="nls_notify_title">女王耳目已断开</string>
@@ -157,12 +157,14 @@
     <string name="album_add_desc">添加照片</string>
     <string name="album_photo_desc">已模糊遮挡的加密照片</string>
     <string name="album_add_title">添加照片</string>
-    <string name="album_add_pick">从相册选取</string>
+    <string name="album_add_pick">从相册选取（可多选）</string>
     <string name="album_add_camera">拍摄一张</string>
     <string name="album_import_ok">已加密保存</string>
     <string name="album_import_ok_deleted">已加密保存，系统相册原图已删除</string>
-    <string name="album_import_delete_failed">已加密保存，但系统相册原图未能删除（请在系统弹窗中允许删除）</string>
+    <string name="album_import_delete_failed">已加密保存，但系统相册原图未能删除。若弹出系统确认框，请点「允许」；云相册/仅云端图片无法删除本地文件。</string>
     <string name="album_import_failed">保存失败，请重试</string>
+    <string name="album_import_batch_ok">已加密保存 %1$d 张</string>
+    <string name="album_import_batch_partial">已加密保存 %1$d 张，%2$d 张失败</string>
     <string name="album_key_failed">加密密钥生成失败</string>
     <string name="album_camera_denied">需要相机权限才能拍摄</string>
     <string name="album_camera_unavailable">当前设备没有可用的相机应用，请从相册选取</string>
@@ -194,7 +196,7 @@
     <string name="daily_selfie_upload_hint">偷懒从相册选图只能拿 1 积分；想多拿就现场拍。</string>
     <string name="daily_selfie_capture_ok">凭证已锁入相册 · 获得 %1$d 积分 · 今日可暂息</string>
     <string name="daily_selfie_upload_ok">凭证已锁入相册 · 上传仅获 %1$d 积分 · 今日可暂息</string>
-    <string name="daily_selfie_upload_delete_failed">凭证已保存，系统相册原图未能删除</string>
+    <string name="daily_selfie_upload_delete_failed">凭证已保存，系统相册原图未能删除。若弹出系统确认框，请点「允许」。</string>
     <string name="daily_selfie_capture_failed">拍摄失败，立刻重拍上交</string>
     <string name="daily_selfie_import_failed">保存失败，立刻重拍上交</string>
     <string name="daily_selfie_camera_denied">必须授予相机权限才能上缴凭证</string>
@@ -248,4 +250,6 @@
     <string name="settings_float_avatar_nvw2_label">女王·贰</string>
     <string name="settings_float_avatar_nvw3_label">女王·叁</string>
     <string name="settings_float_avatar_applied">头像已换，去屏幕上找 Queen。</string>
+    <string name="settings_float_size_label_fmt">悬浮窗大小：%1$d dp（小 ← → 大）</string>
+    <string name="settings_float_size_hint">拖动滑块即时生效；仅缩放女王头像，气泡大小不变。</string>
 </resources>

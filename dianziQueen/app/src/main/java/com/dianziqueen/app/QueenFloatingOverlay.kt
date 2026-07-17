@@ -1,8 +1,8 @@
 package com.dianziqueen.app
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.PixelFormat
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
@@ -11,11 +11,13 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import java.lang.ref.WeakReference
 import kotlin.math.abs
 import kotlin.random.Random
 
@@ -26,10 +28,16 @@ import kotlin.random.Random
  */
 object QueenFloatingOverlay {
 
-    /** 悬浮头像边长（dp），约为初版的 1/2。 */
-    private const val FLOAT_AVATAR_DP = 36f
-    private const val FLOAT_BUBBLE_WIDTH_DP = 110f
-    private const val FLOAT_MENU_WIDTH_DP = 100f
+    /** 悬浮头像边长（dp），约为初版的 1/2；可在设置页调整。 */
+    private fun floatAvatarDp(): Float {
+        val ctx = appContext ?: return QueenFloatingSize.DEFAULT_AVATAR_DP
+        return QueenFloatingSize.avatarDp(ctx)
+    }
+
+    private fun floatBubbleWidthDp(): Float = QueenFloatingSize.bubbleWidthDp()
+
+    private fun floatMenuWidthDp(): Float = QueenFloatingSize.menuWidthDp()
+
     private const val FLOAT_GAP_DP = 3f
     private const val FLOAT_MIN_WINDOW_DP = 40f
 
@@ -38,14 +46,19 @@ object QueenFloatingOverlay {
     private val touchSlop: Int
         get() = (8 * (appContext?.resources?.displayMetrics?.density ?: 1f)).toInt()
 
-    private var rootView: View? = null
+    private var rootViewRef = WeakReference<View>(null)
     private var layoutParams: WindowManager.LayoutParams? = null
     private var windowManager: WindowManager? = null
     private var overlayVisible = false
 
-    private var avatarView: ImageView? = null
-    private var bubbleView: TextView? = null
-    private var menuPanel: LinearLayout? = null
+    private var avatarViewRef = WeakReference<ImageView>(null)
+    private var bubbleViewRef = WeakReference<TextView>(null)
+    private var menuPanelRef = WeakReference<LinearLayout>(null)
+
+    private val rootView: View? get() = rootViewRef.get()
+    private val avatarView: ImageView? get() = avatarViewRef.get()
+    private val bubbleView: TextView? get() = bubbleViewRef.get()
+    private val menuPanel: LinearLayout? get() = menuPanelRef.get()
 
     private var currentMood = QueenFloatingMood.MOCKING
     private var bubbleBelowAvatar: Boolean? = null
@@ -58,6 +71,7 @@ object QueenFloatingOverlay {
     private var touchStartRawX = 0f
     private var touchStartRawY = 0f
     private var dragging = false
+    private var menuCompanionHidden = false
 
     private val prefs
         get() = appContext?.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
@@ -112,27 +126,28 @@ object QueenFloatingOverlay {
             val app = appContext!!
             val wm = ContextCompat.getSystemService(app, WindowManager::class.java) ?: return
             val inflater = LayoutInflater.from(app)
-            val root = inflater.inflate(R.layout.overlay_queen_floating, null)
+            val inflateParent = FrameLayout(app)
+            val root = inflater.inflate(R.layout.overlay_queen_floating, inflateParent, false)
             val avatar = root.findViewById<ImageView>(R.id.queenFloatAvatar)
             val bubble = root.findViewById<TextView>(R.id.queenSpeechBubble)
             val menu = root.findViewById<LinearLayout>(R.id.queenFloatMenu)
 
-            avatarView = avatar
-            bubbleView = bubble
-            menuPanel = menu
+            avatarViewRef = WeakReference(avatar)
+            bubbleViewRef = WeakReference(bubble)
+            menuPanelRef = WeakReference(menu)
 
+            bubble.setTextSize(
+                android.util.TypedValue.COMPLEX_UNIT_SP,
+                QueenFloatingSize.bubbleTextSp(),
+            )
             applyAvatarBase(avatar)
+            applyAvatarSizeCaps(avatar)
             currentMood.applyAvatar(avatar, avatarStyle())
             menu.visibility = View.GONE
             setupAvatarTouch(avatar, wm, root)
             refreshHonorificLabels()
 
-            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                @Suppress("DEPRECATION")
-                WindowManager.LayoutParams.TYPE_PHONE
-            }
+            val type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             val params = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,
@@ -149,7 +164,7 @@ object QueenFloatingOverlay {
             }
 
             wm.addView(root, params)
-            rootView = root
+            rootViewRef = WeakReference(root)
             layoutParams = params
             windowManager = wm
             overlayVisible = true
@@ -165,11 +180,7 @@ object QueenFloatingOverlay {
             scheduleRandomTaunt()
             scheduleRandomInsultToast()
             handler.post {
-                if (!shouldPlaceBubbleBelow()) {
-                    applyBubblePlacement()
-                } else {
-                    bubbleBelowAvatar = true
-                }
+                applyBubblePlacement(forceRelayout = true)
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -182,6 +193,7 @@ object QueenFloatingOverlay {
         handler.removeCallbacks(randomTauntRunnable)
         handler.removeCallbacks(randomInsultToastRunnable)
         QueenMenuDialog.dismiss()
+        menuCompanionHidden = false
         try {
             val wm = windowManager
                 ?: appContext?.let {
@@ -195,17 +207,31 @@ object QueenFloatingOverlay {
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {
-            rootView = null
+            rootViewRef = WeakReference(null)
             layoutParams = null
             windowManager = null
-            avatarView = null
-            bubbleView = null
-            menuPanel = null
+            avatarViewRef = WeakReference(null)
+            bubbleViewRef = WeakReference(null)
+            menuPanelRef = WeakReference(null)
             bubbleBelowAvatar = null
             applyingBubblePlacement = false
             lastTauntRaw = null
             overlayVisible = false
         }
+    }
+
+    /** 菜单打开时隐藏头像悬浮层，避免多 Overlay 在部分 ROM 上抢 Z 序导致菜单无法点击。 */
+    internal fun onMenuOpening() {
+        if (!overlayVisible || menuCompanionHidden) return
+        menuCompanionHidden = true
+        rootView?.visibility = View.INVISIBLE
+    }
+
+    internal fun onMenuClosed() {
+        if (!menuCompanionHidden) return
+        menuCompanionHidden = false
+        rootView?.visibility = View.VISIBLE
+        refreshWindowLayout()
     }
 
     /** 用户更改称谓后，刷新当前气泡文案。 */
@@ -220,13 +246,32 @@ object QueenFloatingOverlay {
     }
 
     fun refreshAppearance() {
-        val avatar = avatarView ?: return
-        applyAvatarBase(avatar)
-        currentMood.applyAvatar(avatar, avatarStyle())
+        refreshSize()
     }
 
+    /** 设置页调整大小或切换样式后调用。 */
+    fun refreshSize() {
+        val avatar = avatarView ?: return
+        if (appContext == null) return
+        applyAvatarBase(avatar)
+        currentMood.applyAvatar(avatar, avatarStyle())
+        if (!overlayVisible) return
+        applyAvatarSizeCaps(avatar)
+        avatar.layoutParams = avatarLayoutParams()
+        avatar.requestLayout()
+        rootView?.requestLayout()
+        refreshWindowLayout()
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
     private fun setupAvatarTouch(avatar: ImageView, wm: WindowManager, root: View) {
-        avatar.setOnTouchListener { _, event ->
+        avatar.setOnClickListener {
+            appContext?.let { ctx ->
+                QueenVibratorHelper.lightTap(ctx)
+                QueenMenuDialog.show(ctx, ::showTaunt)
+            }
+        }
+        avatar.setOnTouchListener { v, event ->
             val params = layoutParams ?: return@setOnTouchListener false
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
@@ -264,10 +309,7 @@ object QueenFloatingOverlay {
                             refreshWindowLayout()
                         }
                     } else {
-                        appContext?.let { ctx ->
-                            QueenVibratorHelper.lightTap(ctx)
-                            QueenMenuDialog.show(ctx, ::showTaunt)
-                        }
+                        v.performClick()
                     }
                     dragging = false
                     true
@@ -302,21 +344,26 @@ object QueenFloatingOverlay {
      * 靠近屏幕顶部时气泡放在头像下方，避免气泡在上方把头像整体挤下去。
      * 靠近底部时气泡放在头像上方。
      */
-    private fun applyBubblePlacement() {
+    private fun applyBubblePlacement(forceRelayout: Boolean = false) {
         if (applyingBubblePlacement) return
         val root = rootView as? LinearLayout ?: return
         val bubble = bubbleView ?: return
         val avatar = avatarView ?: return
         val menu = menuPanel ?: return
         val below = shouldPlaceBubbleBelow()
-        if (bubbleBelowAvatar == below && bubble.parent == root && avatar.parent == root) {
+        val gapPx = dpPx(FLOAT_GAP_DP)
+        if (!forceRelayout &&
+            bubbleBelowAvatar == below &&
+            bubble.parent == root &&
+            avatar.parent == root
+        ) {
+            updateFloatChildLayoutParams(below, gapPx)
             return
         }
         applyingBubblePlacement = true
         try {
             bubbleBelowAvatar = below
 
-            val gapPx = dpPx(FLOAT_GAP_DP)
             val avatarLp = avatarLayoutParams()
             val bubbleLp = bubbleLayoutParams(below, gapPx)
             val menuLp = menuLayoutParams(gapPx)
@@ -333,9 +380,31 @@ object QueenFloatingOverlay {
                 root.addView(avatar, avatarLp)
             }
             root.addView(menu, menuLp)
+            applyAvatarSizeCaps(avatar)
         } finally {
             applyingBubblePlacement = false
         }
+    }
+
+    /** 仅更新尺寸（方向不变时），并解除 XML 里 36dp 的 max 限制。 */
+    private fun updateFloatChildLayoutParams(below: Boolean, gapPx: Int) {
+        val avatar = avatarView ?: return
+        val bubble = bubbleView ?: return
+        val menu = menuPanel ?: return
+        applyAvatarSizeCaps(avatar)
+        avatar.layoutParams = avatarLayoutParams()
+        bubble.layoutParams = bubbleLayoutParams(below, gapPx)
+        menu.layoutParams = menuLayoutParams(gapPx)
+        avatar.requestLayout()
+        bubble.requestLayout()
+        menu.requestLayout()
+        rootView?.requestLayout()
+    }
+
+    private fun applyAvatarSizeCaps(avatar: ImageView) {
+        val side = dpPx(floatAvatarDp())
+        avatar.maxWidth = side
+        avatar.maxHeight = side
     }
 
     private fun detachFromParent(view: View) {
@@ -349,21 +418,21 @@ object QueenFloatingOverlay {
 
     /** 必须用固定 dp，不可用 WRAP_CONTENT，否则 nvw 大图会按原图像素撑满全屏。 */
     private fun avatarLayoutParams(): LinearLayout.LayoutParams {
-        val side = dpPx(FLOAT_AVATAR_DP)
+        val side = dpPx(floatAvatarDp())
         return LinearLayout.LayoutParams(side, side).apply {
             gravity = Gravity.CENTER_HORIZONTAL
         }
     }
 
     private fun bubbleLayoutParams(below: Boolean, gapPx: Int): LinearLayout.LayoutParams =
-        LinearLayout.LayoutParams(dpPx(FLOAT_BUBBLE_WIDTH_DP), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+        LinearLayout.LayoutParams(dpPx(floatBubbleWidthDp()), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
             gravity = Gravity.CENTER_HORIZONTAL
             topMargin = if (below) gapPx else 0
             bottomMargin = if (below) 0 else gapPx
         }
 
     private fun menuLayoutParams(gapPx: Int): LinearLayout.LayoutParams =
-        LinearLayout.LayoutParams(dpPx(FLOAT_MENU_WIDTH_DP), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+        LinearLayout.LayoutParams(dpPx(floatMenuWidthDp()), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
             gravity = Gravity.CENTER_HORIZONTAL
             topMargin = gapPx
         }
@@ -379,6 +448,10 @@ object QueenFloatingOverlay {
      * 悬浮窗必须保持 WRAP_CONTENT，勿写入固定像素宽高，否则系统会把根布局撑满导致「突然变大」。
      */
     private fun refreshWindowLayout() {
+        if (QueenMenuDialog.isShowing()) {
+            QueenMenuDialog.bringToFront()
+            return
+        }
         val root = rootView ?: return
         val wm = windowManager ?: return
         val params = layoutParams ?: return
@@ -417,7 +490,7 @@ object QueenFloatingOverlay {
             return p.getInt(Prefs.QUEEN_FLOAT_X, 0) to p.getInt(Prefs.QUEEN_FLOAT_Y, 0)
         }
         val dm = app?.resources?.displayMetrics ?: return 0 to 0
-        val size = (FLOAT_AVATAR_DP * dm.density).toInt()
+        val size = (floatAvatarDp() * dm.density).toInt()
         val margin = (16 * dm.density).toInt()
         val x = dm.widthPixels - size - margin
         val y = dm.heightPixels - size - margin * 3
@@ -453,10 +526,10 @@ object QueenFloatingOverlay {
             return root.width to root.height
         }
         val d = dm?.density ?: 1f
-        val avatar = (FLOAT_AVATAR_DP * d).toInt()
+        val avatar = (floatAvatarDp() * d).toInt()
         val gap = (FLOAT_GAP_DP * d).toInt()
         val bubbleVisible = bubbleView?.visibility == View.VISIBLE
-        val bubbleW = if (bubbleVisible) (110f * d).toInt() else 0
+        val bubbleW = if (bubbleVisible) (floatBubbleWidthDp() * d).toInt() else 0
         val bubbleH = if (bubbleVisible) (48f * d).toInt() else 0
         val w = maxOf(avatar, bubbleW) + (4f * d).toInt()
         val h = avatar + bubbleH + gap * 2 + (4f * d).toInt()

@@ -29,5 +29,5 @@ data class PermissionStatus(
         CALENDAR,
     }
 
-    val displayOk: Boolean = manualOnly || isGranted
+    val displayOk: Boolean = isGranted
 }

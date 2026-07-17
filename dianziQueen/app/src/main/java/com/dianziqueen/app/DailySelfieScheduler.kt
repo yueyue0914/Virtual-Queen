@@ -4,7 +4,6 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.util.Log
 import java.time.LocalDate
 import java.time.LocalTime
@@ -90,12 +89,7 @@ object DailySelfieScheduler {
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         val pi = PendingIntent.getBroadcast(app, ALARM_REQUEST_CODE, intent, flags)
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-            } else {
-                @Suppress("DEPRECATION")
-                am.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-            }
+            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
         } catch (e: Exception) {
             Log.e(TAG, "scheduleAlarm", e)
         }

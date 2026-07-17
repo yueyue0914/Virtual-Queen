@@ -48,11 +48,15 @@ class PermissionCheckActivity : AppCompatActivity() {
 
     private fun buildPermissionChecks(context: Context): List<PermissionStatus> {
         val manualNote = getString(R.string.perm_check_manual_note)
-        val autostartNote = if (RomPermissionUtils.isXiaomi()) {
-            getString(R.string.perm_check_xiaomi_autostart_note)
-        } else {
-            manualNote
-        }
+        val isDomesticRom = RomPermissionUtils.isDomesticRom()
+        val autostartNote = manualNoteFor(
+            id = "autostart",
+            fallback = if (RomPermissionUtils.isXiaomi()) {
+                getString(R.string.perm_check_xiaomi_autostart_note)
+            } else {
+                manualNote
+            },
+        )
         val activated = context.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
             .getBoolean(Prefs.ACTIVATED, false)
 
@@ -84,12 +88,13 @@ class PermissionCheckActivity : AppCompatActivity() {
                 name = getString(R.string.perm_check_item_notifications),
                 isGranted = NotificationHelper.hasNotificationPermissionReady(context),
                 critical = true,
-                note = if (NotificationHelper.hasNotificationPermissionReady(context) &&
-                    !NotificationHelper.isTeasingChannelImportanceAdequate(context)
-                ) {
-                    hon(R.string.perm_channel_not_high)
-                } else {
-                    ""
+                note = when {
+                    !NotificationHelper.hasEarlyNotificationsReady(context) ->
+                        getString(R.string.perm_notifications_early)
+                    NotificationHelper.hasNotificationPermissionReady(context) &&
+                        !NotificationHelper.isTeasingChannelImportanceAdequate(context) ->
+                        hon(R.string.perm_channel_not_high)
+                    else -> ""
                 },
                 fixAction = PermissionStatus.FixAction.NOTIFICATIONS,
             ),
@@ -153,7 +158,8 @@ class PermissionCheckActivity : AppCompatActivity() {
             PermissionStatus(
                 id = "autostart",
                 name = getString(R.string.perm_check_item_autostart),
-                isGranted = true,
+                isGranted = isManualConfirmed("autostart"),
+                critical = isDomesticRom,
                 manualOnly = true,
                 note = autostartNote,
                 fixAction = PermissionStatus.FixAction.AUTO_START,
@@ -165,9 +171,10 @@ class PermissionCheckActivity : AppCompatActivity() {
                 PermissionStatus(
                     id = "lock_app",
                     name = getString(R.string.perm_check_item_lock_app),
-                    isGranted = true,
+                    isGranted = isManualConfirmed("lock_app"),
+                    critical = true,
                     manualOnly = true,
-                    note = manualNote,
+                    note = manualNoteFor("lock_app", manualNote),
                     fixAction = PermissionStatus.FixAction.ROM_GUIDE,
                 ),
             )
@@ -197,9 +204,10 @@ class PermissionCheckActivity : AppCompatActivity() {
                 PermissionStatus(
                     id = "rom_extra",
                     name = getString(R.string.perm_check_item_rom_extra),
-                    isGranted = true,
+                    isGranted = isManualConfirmed("rom_extra"),
+                    critical = true,
                     manualOnly = true,
-                    note = getString(R.string.perm_check_rom_extra_note),
+                    note = manualNoteFor("rom_extra", getString(R.string.perm_check_rom_extra_note)),
                     fixAction = PermissionStatus.FixAction.ROM_GUIDE,
                 ),
             )
@@ -216,6 +224,20 @@ class PermissionCheckActivity : AppCompatActivity() {
             RomPermissionProbe.needsManualConfirmHint(context, id) ->
                 getString(R.string.perm_check_rom_long_press_confirm)
             else -> ""
+        }
+    }
+
+    private fun isManualConfirmed(id: String): Boolean {
+        val key = RomPermissionProbe.confirmKeyForPermissionId(id) ?: return false
+        return RomPermissionProbe.isUserConfirmed(this, key)
+    }
+
+    private fun manualNoteFor(id: String, fallback: String): String {
+        val key = RomPermissionProbe.confirmKeyForPermissionId(id) ?: return fallback
+        return if (RomPermissionProbe.isUserConfirmed(this, key)) {
+            getString(R.string.perm_check_rom_confirmed_note)
+        } else {
+            fallback
         }
     }
 
@@ -242,13 +264,13 @@ class PermissionCheckActivity : AppCompatActivity() {
 
             nameView.text = item.name
             when {
-                item.manualOnly -> {
-                    statusView.text = getString(R.string.perm_check_status_manual)
-                    statusView.setTextColor(ContextCompat.getColor(this, R.color.text_red_dim))
-                }
                 item.isGranted -> {
                     statusView.text = getString(R.string.perm_check_status_ok)
                     statusView.setTextColor(ContextCompat.getColor(this, R.color.matrix_green_glow))
+                }
+                item.manualOnly -> {
+                    statusView.text = getString(R.string.perm_check_status_manual)
+                    statusView.setTextColor(ContextCompat.getColor(this, R.color.text_red_dim))
                 }
                 else -> {
                     statusView.text = getString(R.string.perm_check_status_missing)

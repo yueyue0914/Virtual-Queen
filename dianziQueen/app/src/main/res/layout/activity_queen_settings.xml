@@ -2,7 +2,6 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FF0A0000"
     android:fillViewport="true"
     android:padding="20dp">
 
@@ -138,6 +137,31 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:text="@string/settings_float_avatar_subtitle"
+                android:textColor="@color/text_red_dim"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/settingsFloatSizeLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:textColor="@color/text_red_primary"
+                android:textSize="13sp" />
+
+            <SeekBar
+                android:id="@+id/settingsFloatSizeSeek"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:max="48"
+                android:progressTint="@color/crimson_glow"
+                android:thumbTint="@color/crimson_glow" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/settings_float_size_hint"
                 android:textColor="@color/text_red_dim"
                 android:textSize="11sp" />
 
@@ -371,9 +395,11 @@
             </RadioGroup>
 
             <TextView
+                android:id="@+id/settingsDeclarationRandomMinLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
+                android:labelFor="@id/settingsDeclarationRandomMinEdit"
                 android:text="@string/settings_declaration_random_min_label"
                 android:textColor="@color/text_red_muted"
                 android:textSize="12sp" />
@@ -384,14 +410,17 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:background="@drawable/bg_password_input"
+                android:importantForAutofill="no"
                 android:inputType="number"
                 android:padding="10dp"
                 android:textColor="@color/text_red_primary" />
 
             <TextView
+                android:id="@+id/settingsDeclarationRandomMaxLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
+                android:labelFor="@id/settingsDeclarationRandomMaxEdit"
                 android:text="@string/settings_declaration_random_max_label"
                 android:textColor="@color/text_red_muted"
                 android:textSize="12sp" />
@@ -402,14 +431,17 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:background="@drawable/bg_password_input"
+                android:importantForAutofill="no"
                 android:inputType="number"
                 android:padding="10dp"
                 android:textColor="@color/text_red_primary" />
 
             <TextView
+                android:id="@+id/settingsDeclarationFixedLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
+                android:labelFor="@id/settingsDeclarationFixedEdit"
                 android:text="@string/settings_declaration_fixed_label"
                 android:textColor="@color/text_red_muted"
                 android:textSize="12sp" />
@@ -420,6 +452,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:background="@drawable/bg_password_input"
+                android:importantForAutofill="no"
                 android:inputType="number"
                 android:padding="10dp"
                 android:textColor="@color/text_red_primary" />

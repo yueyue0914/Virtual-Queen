@@ -61,12 +61,37 @@ object FloatingWindowPermissionHelper {
     fun tryOpenXiaomiExtraSettings(context: Context): Boolean {
         val pkg = context.packageName
         val candidates = listOf(
+            Intent("miui.intent.action.APP_PERM_EDITOR").apply {
+                putExtra("extra_pkgname", pkg)
+                putExtra("packageName", pkg)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
             Intent().apply {
                 component = ComponentName(
                     "com.miui.securitycenter",
                     "com.miui.permcenter.permissions.PermissionsEditorActivity",
                 )
                 putExtra("extra_pkgname", pkg)
+                putExtra("packageName", pkg)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+            Intent().apply {
+                component = ComponentName(
+                    "com.miui.securitycenter",
+                    "com.miui.permcenter.permissions.AppPermissionsEditorActivity",
+                )
+                putExtra("extra_pkgname", pkg)
+                putExtra("packageName", pkg)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+            Intent().apply {
+                component = ComponentName(
+                    "com.miui.securitycenter",
+                    "com.miui.permcenter.permissions.PermissionsEditorActivity",
+                )
+                putExtra("extra_pkgname", pkg)
+                putExtra("packageName", pkg)
+                putExtra("extra_package_uid", context.applicationInfo.uid)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             },
             Intent().apply {
@@ -76,8 +101,16 @@ object FloatingWindowPermissionHelper {
                 )
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             },
-            Intent("miui.intent.action.APP_PERM_EDITOR").apply {
+            Intent("miui.intent.action.OP_AUTO_START").apply {
+                addCategory(Intent.CATEGORY_DEFAULT)
                 putExtra("extra_pkgname", pkg)
+                putExtra("packageName", pkg)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            },
+            Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:$pkg"),
+            ).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             },
         )

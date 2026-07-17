@@ -6,6 +6,7 @@ import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.RadioButton
+import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.widget.SwitchCompat
@@ -31,6 +32,9 @@ class QueenSettingsActivity : AppCompatActivity() {
     private lateinit var declarationPreviewText: TextView
 
     private lateinit var floatStyleOptions: List<FloatStyleOption>
+    private lateinit var floatSizeSeek: SeekBar
+    private lateinit var floatSizeLabel: TextView
+    private var floatSizeSeekUpdating = false
 
     private data class FloatStyleOption(
         val container: LinearLayout,
@@ -79,6 +83,22 @@ class QueenSettingsActivity : AppCompatActivity() {
             FloatStyleOption(findViewById(R.id.settingsFloatStyleNvw2), QueenFloatingAvatarStyle.NVW2),
             FloatStyleOption(findViewById(R.id.settingsFloatStyleNvw3), QueenFloatingAvatarStyle.NVW3),
         )
+        floatSizeSeek = findViewById(R.id.settingsFloatSizeSeek)
+        floatSizeLabel = findViewById(R.id.settingsFloatSizeLabel)
+        floatSizeSeek.max = (QueenFloatingSize.MAX_AVATAR_DP - QueenFloatingSize.MIN_AVATAR_DP).toInt()
+        floatSizeSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser || floatSizeSeekUpdating) return
+                val dp = QueenFloatingSize.dpFromSeekBarProgress(progress)
+                QueenFloatingSize.setAvatarDp(this@QueenSettingsActivity, dp)
+                updateFloatSizeLabel(dp)
+                QueenFloatingOverlay.refreshSize()
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
+        })
         for (option in floatStyleOptions) {
             option.container.setOnClickListener { selectFloatAvatarStyle(option.style) }
         }
@@ -92,6 +112,7 @@ class QueenSettingsActivity : AppCompatActivity() {
             startActivity(PermissionCheckActivity.createIntent(this))
         }
         refreshStats()
+        refreshFloatSizeUi()
         refreshFloatAvatarSelectionUi()
         refreshHonorificSection()
         refreshReleaseTexts()
@@ -105,6 +126,7 @@ class QueenSettingsActivity : AppCompatActivity() {
         super.onResume()
         refreshStats()
         updateReleaseButtonLabel()
+        refreshFloatSizeUi()
         refreshFloatAvatarSelectionUi()
         refreshHonorificSection()
         refreshReleaseTexts()
@@ -245,7 +267,23 @@ class QueenSettingsActivity : AppCompatActivity() {
         }
         refreshFloatAvatarSelectionUi()
         Toast.makeText(this, hon(R.string.settings_float_avatar_applied), Toast.LENGTH_SHORT).show()
+        QueenFloatingOverlay.refreshSize()
         refreshFloatAvatarStyleLabels()
+    }
+
+    private fun refreshFloatSizeUi() {
+        val dp = QueenFloatingSize.avatarDp(this)
+        updateFloatSizeLabel(dp)
+        floatSizeSeekUpdating = true
+        floatSizeSeek.progress = QueenFloatingSize.seekBarProgress(this)
+        floatSizeSeekUpdating = false
+    }
+
+    private fun updateFloatSizeLabel(dp: Float) {
+        floatSizeLabel.text = getString(
+            R.string.settings_float_size_label_fmt,
+            dp.toInt(),
+        )
     }
 
     private fun refreshFloatAvatarSelectionUi() {

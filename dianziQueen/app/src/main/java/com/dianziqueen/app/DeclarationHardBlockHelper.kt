@@ -4,7 +4,6 @@ import android.app.Activity
 import android.app.ActivityManager
 import android.app.admin.DevicePolicyManager
 import android.content.Context
-import android.os.Build
 import android.util.Log
 
 /** 宣誓页硬锁：Lock Task（屏幕固定）；非 Device Owner 时 best-effort，失败一次后永久闭嘴。 */
@@ -35,7 +34,6 @@ object DeclarationHardBlockHelper {
         if (!DeclarationInterceptor.isActive()) return
         if (!lockTaskSupported) return
         if (hardLockAttemptedThisChallenge) return
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) return
 
         hardLockAttemptedThisChallenge = true
 
@@ -55,7 +53,6 @@ object DeclarationHardBlockHelper {
     }
 
     fun exit(activity: Activity) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) return
         if (!isLockTaskLocked(activity)) return
         runCatching {
             activity.stopLockTask()
@@ -82,7 +79,6 @@ object DeclarationHardBlockHelper {
     }
 
     private fun isLockTaskLocked(activity: Activity): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false
         val am = activity.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         return am.lockTaskModeState == ActivityManager.LOCK_TASK_MODE_LOCKED
     }

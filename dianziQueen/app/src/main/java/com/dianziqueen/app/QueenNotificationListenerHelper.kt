@@ -82,11 +82,11 @@ object QueenNotificationListenerHelper {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
-        NotificationManagerCompat.from(context).notify(NOTIFY_ID_NLS, n)
+        NotificationHelper.notify(context, NOTIFY_ID_NLS, n)
     }
 
     fun cancelDisconnectedNotification(context: Context) {
-        NotificationManagerCompat.from(context).cancel(NOTIFY_ID_NLS)
+        NotificationHelper.cancel(context, NOTIFY_ID_NLS)
     }
 
     fun onListenerConnected(context: Context) {

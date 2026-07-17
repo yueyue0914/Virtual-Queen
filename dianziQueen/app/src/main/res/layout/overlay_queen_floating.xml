@@ -11,14 +11,12 @@
     <!-- 顺序由 QueenFloatingOverlay.applyBubblePlacement() 按屏幕位置动态调整 -->
     <ImageView
         android:id="@+id/queenFloatAvatar"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
         android:adjustViewBounds="true"
         android:contentDescription="@string/queen_float_avatar_desc"
         android:importantForAccessibility="yes"
-        android:maxWidth="36dp"
-        android:maxHeight="36dp"
         android:scaleType="centerCrop"
         android:src="@drawable/ic_queen_foreground" />
 
@@ -33,7 +31,7 @@
         android:paddingHorizontal="5dp"
         android:paddingVertical="4dp"
         android:textColor="@color/text_red_primary"
-        android:textSize="10sp"
+        android:textSize="11sp"
         android:visibility="gone" />
 
     <LinearLayout

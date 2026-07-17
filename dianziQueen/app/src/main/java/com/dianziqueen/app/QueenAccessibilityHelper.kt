@@ -4,7 +4,6 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.provider.Settings
 import android.text.TextUtils
 import android.view.accessibility.AccessibilityManager
@@ -102,17 +101,15 @@ object QueenAccessibilityHelper {
      */
     fun openQueenAccessibilitySettings(context: Context) {
         val component = serviceComponent(context)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            try {
-                context.startActivity(
-                    Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS").apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        putExtra("android.intent.extra.COMPONENT_NAME", component.flattenToString())
-                    },
-                )
-                return
-            } catch (_: Exception) { }
-        }
+        try {
+            context.startActivity(
+                Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS").apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    putExtra("android.intent.extra.COMPONENT_NAME", component.flattenToString())
+                },
+            )
+            return
+        } catch (_: Exception) { }
         openAccessibilitySettings(context)
     }
 
@@ -156,12 +153,10 @@ object QueenAccessibilityHelper {
             .setAutoCancel(true)
             .setPriority(androidx.core.app.NotificationCompat.PRIORITY_HIGH)
             .build()
-        androidx.core.app.NotificationManagerCompat.from(context)
-            .notify(NOTIFY_ID_ACCESSIBILITY, n)
+        NotificationHelper.notify(context, NOTIFY_ID_ACCESSIBILITY, n)
     }
 
     fun cancelAccessibilityNotification(context: Context) {
-        androidx.core.app.NotificationManagerCompat.from(context)
-            .cancel(NOTIFY_ID_ACCESSIBILITY)
+        NotificationHelper.cancel(context, NOTIFY_ID_ACCESSIBILITY)
     }
 }

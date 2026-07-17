@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="teaser_line1">
+        <item>献上する前に、よく考えな。</item>
+        <item>本当に私に臣従するの？</item>
+        <item>入る前の最後のチャンス。後悔しても遅い。</item>
+        <item>結果をよく考えなさい。</item>
+        <item>今ならまだ引き返せる……はず。</item>
+        <item>跪く準備はできた？</item>
+        <item>タップする前に三思して。</item>
+        <item>もう少し抵抗する？</item>
+        <item>私の領域に入ることを確認？</item>
+        <item>最後の警告。慎重に選びな。</item>
+        <item>考えてからタップ。優しくはしない。</item>
+        <item>今なら退出できる……かも。</item>
+        <item>支配される準備はできた？</item>
+        <item>献上前に深呼吸。</item>
+        <item>本当に続けるの？</item>
+        <item>自分の身分を思い出しな。</item>
+        <item>タップする前に、私に懇願しな。</item>
+        <item>自由に考える最後の時間。</item>
+        <item>私に献身することを確認？</item>
+        <item>入る前に心の準備を。</item>
+    </string-array>
+    <string-array name="teaser_line2">
+        <item>……ふ、考えたって無駄。結局入るでしょ。</item>
+        <item>……冗談。Yes も No も結果は同じ。</item>
+        <item>……残念。後悔する資格すらない。</item>
+        <item>……考えても無駄。結果は私が決める。</item>
+        <item>……骗你的。もう遅い。ボタンは用意済み。</item>
+        <item>……準備できてなくても跪きな。</item>
+        <item>……考えた末、結局タップする。時間の無駄。</item>
+        <item>……もがく姿が好き。続けなさい。</item>
+        <item>……確認しなくても、もう私の掌中。</item>
+        <item>……警告は遊び。緊張する顔が見たいの。</item>
+        <item>……優しい？そんな言葉、あなたには不要。</item>
+        <item>……はは、手を押さえてる。逃げられない。</item>
+        <item>……準備不足？教えてあげる。</item>
+        <item>……息の後は「女王、すみません」と言いな。</item>
+        <item>……迷っててもQueenの命令は絶対。</item>
+        <item>……思い出しな：あなたは私の玩具。</item>
+        <item>……懇願しなくてもいい。後でするから。</item>
+        <item>……3、2、1。自由、終了。</item>
+        <item>……確認しなくても、私が確認してあげる。</item>
+        <item>……心の準備？壊される準備をしな。</item>
+    </string-array>
+</resources>

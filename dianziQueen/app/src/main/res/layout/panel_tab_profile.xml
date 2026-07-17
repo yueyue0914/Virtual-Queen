@@ -25,6 +25,8 @@
                 android:layout_height="wrap_content"
                 android:layout_alignParentStart="true"
                 android:layout_centerVertical="true"
+                android:layout_toStartOf="@id/profilePointsText"
+                android:layout_marginEnd="8dp"
                 android:letterSpacing="0.12"
                 android:text="@string/profile_title"
                 android:textColor="@color/crimson_glow"

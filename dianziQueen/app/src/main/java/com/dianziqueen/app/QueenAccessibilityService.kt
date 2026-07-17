@@ -42,8 +42,9 @@ class QueenAccessibilityService : AccessibilityService() {
     private fun handleWindowContentChanged(event: AccessibilityEvent) {
         if (!SettingsLockGuard.shouldBlockSystemSettings(this)) return
         val pkg = event.packageName?.toString().orEmpty()
-        if (!SettingsLockGuard.isBlockedExternalWindow(this, pkg)) return
-        SettingsLockGuard.onSystemSettingsEntered(this, "content:$pkg", fromWindowStateChange = false)
+        val cls = event.className?.toString().orEmpty()
+        if (!SettingsLockGuard.isBlockedExternalWindow(this, pkg, cls)) return
+        SettingsLockGuard.onSystemSettingsEntered(this, "content:$pkg/$cls", fromWindowStateChange = false)
     }
 
     private fun scanActiveWindowForThreats(event: AccessibilityEvent) {
@@ -52,8 +53,8 @@ class QueenAccessibilityService : AccessibilityService() {
         val root = rootInActiveWindow ?: return
         try {
             if (SettingsLockGuard.shouldBlockSystemSettings(this)) {
-                if (SettingsLockGuard.isBlockedExternalWindow(this, pkg)) {
-                    SettingsLockGuard.onSystemSettingsEntered(this, "window:$pkg", fromWindowStateChange = true)
+                if (SettingsLockGuard.isBlockedExternalWindow(this, pkg, cls)) {
+                    SettingsLockGuard.onSystemSettingsEntered(this, "window:$pkg/$cls", fromWindowStateChange = true)
                     return
                 }
             }

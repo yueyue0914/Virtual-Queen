@@ -3,54 +3,75 @@ package com.dianziqueen.app
 import android.content.Context
 import android.graphics.PixelFormat
 import android.os.Build
+import android.util.Log
+import android.view.KeyEvent
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import java.lang.ref.WeakReference
 
 /**
  * 悬浮头像点击后的全屏菜单（Overlay 对话框，无需 Activity 前台）。
  */
 object QueenMenuDialog {
 
-    private var dialogRoot: View? = null
+    private const val TAG = "QueenMenuDialog"
+
+    private var dialogRootRef = WeakReference<View>(null)
     private var windowManager: WindowManager? = null
     private var layoutParams: WindowManager.LayoutParams? = null
+
+    private val dialogRoot: View? get() = dialogRootRef.get()
 
     fun isShowing(): Boolean = dialogRoot?.isAttachedToWindow == true
 
     fun show(context: Context, showTaunt: (QueenFloatingMood, String) -> Unit) {
-        if (isShowing()) return
+        if (isShowing()) {
+            bringToFront()
+            return
+        }
         if (!FloatingWindowPermissionHelper.hasPermission(context)) return
         val app = context.applicationContext
         try {
             val wm = ContextCompat.getSystemService(app, WindowManager::class.java) ?: return
-            val root = LayoutInflater.from(app).inflate(R.layout.dialog_queen_float_menu, null)
+            val inflateParent = FrameLayout(app)
+            val root = LayoutInflater.from(app)
+                .inflate(R.layout.dialog_queen_float_menu, inflateParent, false)
             bindLabels(app, root)
             bindActions(app, root, showTaunt)
+            setupTouchAndKeys(root)
 
-            root.findViewById<View>(R.id.queenMenuDialogScrim).setOnClickListener { dismiss() }
-
-            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                @Suppress("DEPRECATION")
-                WindowManager.LayoutParams.TYPE_PHONE
-            }
+            val type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             val params = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT,
                 type,
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT,
             )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                params.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+            QueenFloatingOverlay.onMenuOpening()
             wm.addView(root, params)
-            dialogRoot = root
+            dialogRootRef = WeakReference(root)
             windowManager = wm
             layoutParams = params
+            root.post {
+                root.isFocusable = true
+                root.isFocusableInTouchMode = true
+                root.requestFocus()
+                bringToFront()
+            }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "show failed", e)
             dismiss()
         }
     }
@@ -62,10 +83,66 @@ object QueenMenuDialog {
             if (wm != null && view != null && view.isAttachedToWindow) {
                 wm.removeView(view)
             }
-        } catch (_: Exception) { }
-        dialogRoot = null
-        windowManager = null
-        layoutParams = null
+        } catch (e: Exception) {
+            Log.w(TAG, "dismiss removeView failed", e)
+        } finally {
+            dialogRootRef = WeakReference(null)
+            windowManager = null
+            layoutParams = null
+            QueenFloatingOverlay.onMenuClosed()
+        }
+    }
+
+    /** 部分 ROM 会在其它悬浮窗 updateViewLayout 后把菜单压到下层，需重新置顶。 */
+    fun bringToFront() {
+        val wm = windowManager ?: return
+        val view = dialogRoot ?: return
+        val params = layoutParams ?: return
+        if (!view.isAttachedToWindow) return
+        try {
+            wm.updateViewLayout(view, params)
+        } catch (e: Exception) {
+            Log.w(TAG, "bringToFront failed", e)
+        }
+    }
+
+    private fun setupTouchAndKeys(root: View) {
+        val scrim = root.findViewById<View>(R.id.queenMenuDialogScrim)
+        val panel = root.findViewById<View>(R.id.queenMenuDialogPanel)
+
+        scrim.isClickable = true
+        scrim.isFocusable = true
+        scrim.setBackgroundColor(0x88000000.toInt())
+        scrim.setOnClickListener { dismiss() }
+        // 部分机型 OnClickListener 不可靠，用 Touch 兜底。
+        scrim.setOnTouchListener { v, event ->
+            if (event.action == MotionEvent.ACTION_UP && !isTouchInsideView(panel, event)) {
+                dismiss()
+                true
+            } else {
+                v.onTouchEvent(event)
+            }
+        }
+
+        panel.setOnClickListener { /* 吃掉点击，避免误触 scrim */ }
+
+        root.setOnKeyListener { _, keyCode, event ->
+            if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                dismiss()
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    private fun isTouchInsideView(view: View, event: MotionEvent): Boolean {
+        val loc = IntArray(2)
+        view.getLocationOnScreen(loc)
+        val x = event.rawX
+        val y = event.rawY
+        return x >= loc[0] && x <= loc[0] + view.width &&
+            y >= loc[1] && y <= loc[1] + view.height
     }
 
     private fun bindLabels(app: Context, root: View) {

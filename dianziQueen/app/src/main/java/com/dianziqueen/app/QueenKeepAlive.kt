@@ -11,9 +11,7 @@ import android.content.Context
 import android.content.Intent
 
 import android.os.Build
-
 import android.util.Log
-
 import androidx.core.app.NotificationCompat
 
 import androidx.core.app.NotificationManagerCompat
@@ -442,37 +440,17 @@ object QueenKeepAlive {
 
         try {
 
-            when {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
 
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> {
+                !am.canScheduleExactAlarms()
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ) {
 
-                        !am.canScheduleExactAlarms()
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
 
-                    ) {
+            } else {
 
-                        am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-
-                    } else {
-
-                        am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-
-                    }
-
-                }
-
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT -> {
-
-                    am.setExact(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-
-                }
-
-                else -> {
-
-                    am.set(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-
-                }
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
 
             }
 
@@ -482,15 +460,7 @@ object QueenKeepAlive {
 
             try {
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-
-                    am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-
-                } else {
-
-                    am.set(AlarmManager.RTC_WAKEUP, triggerAt, pi)
-
-                }
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pi)
 
             } catch (e2: Exception) {
 
@@ -530,13 +500,13 @@ object QueenKeepAlive {
 
         )
 
-        val n = NotificationCompat.Builder(context, DianziQueenApp.CHANNEL_TEASING)
+        val n = NotificationCompat.Builder(context, DianziQueenApp.CHANNEL_DAEMON)
 
             .setSmallIcon(android.R.drawable.ic_popup_reminder)
 
-            .setContentTitle(context.getString(R.string.keep_alive_notify_title))
+            .setContentTitle(context.getString(R.string.daemon_notification_title))
 
-            .setContentText(context.getString(R.string.keep_alive_notify_text))
+            .setContentText(context.getString(R.string.daemon_notification_text))
 
             .setContentIntent(pi)
 
@@ -546,7 +516,7 @@ object QueenKeepAlive {
 
             .build()
 
-        NotificationManagerCompat.from(context).notify(NOTIFY_ID_RESTORED, n)
+        NotificationHelper.notify(context, NOTIFY_ID_RESTORED, n)
 
     }
 

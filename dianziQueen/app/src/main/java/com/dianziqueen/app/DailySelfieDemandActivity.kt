@@ -186,10 +186,8 @@ class DailySelfieDemandActivity : AppCompatActivity() {
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-        }
+        setShowWhenLocked(true)
+        setTurnScreenOn(true)
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.BLACK
         WindowInsetsControllerCompat(window, window.decorView).apply {

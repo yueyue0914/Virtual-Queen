@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="honorific_settings_change_btn">称呼を変更</string>
+    <string name="honorific_picker_title">称呼を設定</string>
+    <string name="honorific_picker_ok">确定</string>
+    <string name="honorific_preset_queen">女王</string>
+    <string name="honorific_preset_black_dad">主人</string>
+    <string name="honorific_preset_master">ご主人様</string>
+    <string name="honorific_preset_dad">パパ</string>
+    <string name="honorific_preset_mom">ママ</string>
+    <string name="honorific_settings_section_title">称呼</string>
+    <string name="honorific_settings_section_subtitle">台詞・通知・メッセージ内の Queen / 女王 を置き換えます。</string>
+    <string name="honorific_settings_current_fmt">現在：%1$s</string>
+    <string name="honorific_applied_fmt">切り替えました：%1$s</string>
+</resources>

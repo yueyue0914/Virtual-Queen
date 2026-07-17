@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/queenMenuDialogScrim"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#88000000"
     android:clickable="true"
-    android:focusable="true">
+    android:focusable="true"
+    tools:ignore="UselessParent">
 
     <LinearLayout
         android:id="@+id/queenMenuDialogPanel"
         android:layout_width="240dp"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:background="@drawable/bg_queen_float_menu"
-        android:clickable="true"
+        android:background="@drawable/bg_queen_float_menu"        android:clickable="true"
         android:focusable="true"
         android:orientation="vertical"
         android:padding="8dp">

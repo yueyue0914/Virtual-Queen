@@ -20,6 +20,9 @@ object RomPermissionProbe {
     const val CONFIRM_OVERLAY = "rom_confirm_overlay"
     const val CONFIRM_WRITE_SETTINGS = "rom_confirm_write_settings"
     const val CONFIRM_BATTERY = "rom_confirm_battery"
+    const val CONFIRM_AUTOSTART = "rom_confirm_autostart"
+    const val CONFIRM_LOCK_APP = "rom_confirm_lock_app"
+    const val CONFIRM_ROM_EXTRA = "rom_confirm_rom_extra"
 
     fun isUserConfirmed(context: Context, key: String): Boolean =
         context.applicationContext
@@ -36,7 +39,6 @@ object RomPermissionProbe {
 
     /** 悬浮窗：canDrawOverlays + AppOps（全品牌，不仅小米）。 */
     fun isOverlayGranted(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
         if (Settings.canDrawOverlays(context)) return true
         if (isAppOpGranted(context, AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW)) return true
         if (RomPermissionUtils.isDomesticRom() && isUserConfirmed(context, CONFIRM_OVERLAY)) {
@@ -47,7 +49,6 @@ object RomPermissionProbe {
 
     /** 仅自动检测通道（不含用户手动确认），供 UI 提示用。 */
     fun isOverlayAutoDetected(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
         if (Settings.canDrawOverlays(context)) return true
         return isAppOpGranted(context, AppOpsManager.OPSTR_SYSTEM_ALERT_WINDOW)
     }
@@ -71,28 +72,48 @@ object RomPermissionProbe {
 
     /** 电池优化豁免 + 国产 ROM 后台运行 AppOps。 */
     fun isBatteryExempt(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
         val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return true
-        if (pm.isIgnoringBatteryOptimizations(context.packageName)) return true
-        if (RomPermissionUtils.isDomesticRom()) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                isAppOpGranted(context, OP_RUN_ANY_IN_BACKGROUND)
-            ) {
-                return true
-            }
-            if (isAppOpGranted(context, OP_RUN_IN_BACKGROUND)) {
-                return true
-            }
-            if (isUserConfirmed(context, CONFIRM_BATTERY)) return true
+        if (pm.isIgnoringBatteryOptimizations(context.packageName)) {
+            // 标准 Android / 部分机型：「不优化」即可
+            if (!RomPermissionUtils.isXiaomi()) return true
+            // 小米/红米：「不优化」后仍须「省电策略 → 无限制」，否则 AppOps 仍判未豁免
+            if (isXiaomiBatteryFullyGranted(context)) return true
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            isAppOpGranted(context, OP_RUN_ANY_IN_BACKGROUND)
+        ) {
+            return true
+        }
+        if (isAppOpGranted(context, OP_RUN_IN_BACKGROUND)) {
+            return true
+        }
+        if (RomPermissionUtils.isDomesticRom() &&
+            isUserConfirmed(context, CONFIRM_BATTERY)
+        ) {
+            return true
         }
         return false
     }
 
+    /** 小米在「不优化」之外，后台 AppOps 或用户手动确认视为完成省电策略。 */
+    private fun isXiaomiBatteryFullyGranted(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            isAppOpGranted(context, OP_RUN_ANY_IN_BACKGROUND)
+        ) {
+            return true
+        }
+        if (isAppOpGranted(context, OP_RUN_IN_BACKGROUND)) {
+            return true
+        }
+        return isUserConfirmed(context, CONFIRM_BATTERY)
+    }
+
     fun isBatteryAutoDetected(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
         val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return true
-        if (pm.isIgnoringBatteryOptimizations(context.packageName)) return true
-        if (!RomPermissionUtils.isDomesticRom()) return false
+        if (pm.isIgnoringBatteryOptimizations(context.packageName)) {
+            if (!RomPermissionUtils.isXiaomi()) return true
+            return isXiaomiBatteryFullyGranted(context)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
             isAppOpGranted(context, OP_RUN_ANY_IN_BACKGROUND)
         ) {
@@ -105,6 +126,9 @@ object RomPermissionProbe {
         "overlay" -> CONFIRM_OVERLAY
         "write_settings" -> CONFIRM_WRITE_SETTINGS
         "battery" -> CONFIRM_BATTERY
+        "autostart" -> CONFIRM_AUTOSTART
+        "lock_app" -> CONFIRM_LOCK_APP
+        "rom_extra" -> CONFIRM_ROM_EXTRA
         else -> null
     }
 
@@ -116,6 +140,7 @@ object RomPermissionProbe {
             "overlay" -> !isOverlayAutoDetected(context)
             "write_settings" -> !isWriteSettingsAutoDetected(context)
             "battery" -> !isBatteryAutoDetected(context)
+            "autostart", "lock_app", "rom_extra" -> true
             else -> false
         }
     }

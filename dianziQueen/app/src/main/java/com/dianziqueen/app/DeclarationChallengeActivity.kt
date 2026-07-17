@@ -161,12 +161,7 @@ class DeclarationChallengeActivity : AppCompatActivity() {
         runOnUiThread {
             if (isFinishing) return@runOnUiThread
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    finishAndRemoveTask()
-                } else {
-                    @Suppress("DEPRECATION")
-                    finish()
-                }
+                finishAndRemoveTask()
                 @Suppress("DEPRECATION")
                 overridePendingTransition(0, 0)
             } catch (_: Exception) {
@@ -184,12 +179,7 @@ class DeclarationChallengeActivity : AppCompatActivity() {
         runOnUiThread {
             if (isFinishing) return@runOnUiThread
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    finishAndRemoveTask()
-                } else {
-                    @Suppress("DEPRECATION")
-                    finish()
-                }
+                finishAndRemoveTask()
                 @Suppress("DEPRECATION")
                 overridePendingTransition(0, 0)
             } catch (_: Exception) {
@@ -229,13 +219,8 @@ class DeclarationChallengeActivity : AppCompatActivity() {
             @Suppress("DEPRECATION")
             getSystemService(VIBRATOR_SERVICE) as? Vibrator
         } ?: return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(
-                VibrationEffect.createWaveform(longArrayOf(0, 180, 80, 220), -1),
-            )
-        } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(longArrayOf(0, 180, 80, 220), -1)
-        }
+        vibrator.vibrate(
+            VibrationEffect.createWaveform(longArrayOf(0, 180, 80, 220), -1),
+        )
     }
 }

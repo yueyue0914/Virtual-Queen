@@ -36,5 +36,5 @@
         android:layout_marginTop="4dp"
         android:layout_marginStart="4dp"
         android:textColor="@color/text_red_muted"
-        android:textSize="10sp" />
+        android:textSize="11sp" />
 </LinearLayout>

@@ -104,10 +104,8 @@ class ShutdownHumiliationActivity : AppCompatActivity(), TextToSpeech.OnInitList
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-        }
+        setShowWhenLocked(true)
+        setTurnScreenOn(true)
         window.statusBarColor = Color.BLACK
         window.navigationBarColor = Color.BLACK
         WindowInsetsControllerCompat(window, window.decorView).apply {
@@ -135,18 +133,13 @@ class ShutdownHumiliationActivity : AppCompatActivity(), TextToSpeech.OnInitList
     private fun pulseVibrate() {
         val v = vibrator() ?: return
         if (!v.hasVibrator()) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            v.vibrate(
-                VibrationEffect.createWaveform(
-                    longArrayOf(0, 120, 60, 180, 60, 260),
-                    intArrayOf(0, 200, 0, 255, 0, 255),
-                    -1,
-                ),
-            )
-        } else {
-            @Suppress("DEPRECATION")
-            v.vibrate(longArrayOf(0, 120, 60, 180, 60, 260), -1)
-        }
+        v.vibrate(
+            VibrationEffect.createWaveform(
+                longArrayOf(0, 120, 60, 180, 60, 260),
+                intArrayOf(0, 200, 0, 255, 0, 255),
+                -1,
+            ),
+        )
     }
 
     private fun vibrator(): Vibrator? {

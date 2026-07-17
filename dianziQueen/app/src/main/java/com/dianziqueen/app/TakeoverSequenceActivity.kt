@@ -14,6 +14,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.view.View
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
@@ -172,6 +173,7 @@ class TakeoverSequenceActivity : AppCompatActivity() {
         }
     }
 
+    @Suppress("SetTextI18n") // dynamic typewriter UI requires concatenation
     private fun typewriterAppend(text: String, onComplete: () -> Unit) {
         val token = ++typewriterToken
         val base = binding.tvLog.text?.toString().orEmpty()
@@ -236,6 +238,7 @@ class TakeoverSequenceActivity : AppCompatActivity() {
 
         vibrateStrong()
         QueenDeviceNameHelper.applyQueenDeviceName(this)
+        Toast.makeText(this, hon(R.string.toast_takeover_complete), Toast.LENGTH_LONG).show()
 
         handler.postDelayed({
             setResult(Activity.RESULT_OK)
@@ -256,28 +259,18 @@ class TakeoverSequenceActivity : AppCompatActivity() {
     private fun vibrate(ms: Long) {
         val v = vibrator() ?: return
         if (!v.hasVibrator()) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            v.vibrate(VibrationEffect.createOneShot(ms, 80))
-        } else {
-            @Suppress("DEPRECATION")
-            v.vibrate(ms)
-        }
+        v.vibrate(VibrationEffect.createOneShot(ms, 80))
     }
 
     private fun vibrateStrong() {
         val v = vibrator() ?: return
         if (!v.hasVibrator()) return
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            v.vibrate(
-                VibrationEffect.createWaveform(
-                    longArrayOf(0, 280, 90, 320, 90, 520, 120, 680),
-                    intArrayOf(0, 200, 0, 255, 0, 255, 0, 255),
-                    -1,
-                ),
-            )
-        } else {
-            @Suppress("DEPRECATION")
-            v.vibrate(longArrayOf(0, 280, 90, 320, 90, 520, 120, 680), -1)
-        }
+        v.vibrate(
+            VibrationEffect.createWaveform(
+                longArrayOf(0, 280, 90, 320, 90, 520, 120, 680),
+                intArrayOf(0, 200, 0, 255, 0, 255, 0, 255),
+                -1,
+            ),
+        )
     }
 }

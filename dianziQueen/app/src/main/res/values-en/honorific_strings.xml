@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="honorific_settings_change_btn">Change honorific</string>
+    <string name="honorific_picker_title">Set honorific</string>
+    <string name="honorific_picker_ok">OK</string>
+    <string name="honorific_preset_queen">QUEEN</string>
+    <string name="honorific_applied_fmt">Switched to: %1$s</string>
+    <string name="honorific_preset_black_dad">Sir</string>
+    <string name="honorific_preset_master">Master</string>
+    <string name="honorific_preset_dad">Daddy</string>
+    <string name="honorific_preset_mom">Mommy</string>
+    <string name="honorific_settings_section_title">Honorific</string>
+    <string name="honorific_settings_section_subtitle">Replaces Queen / 女王 in lines, notifications, and messages.</string>
+    <string name="honorific_settings_current_fmt">Current: %1$s</string>
+</resources>

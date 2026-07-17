@@ -3,7 +3,6 @@ package com.dianziqueen.app
 import android.app.KeyguardManager
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.PowerManager
 
 object DeclarationEnforcement {
@@ -70,9 +69,7 @@ object DeclarationEnforcement {
             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
             addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
-            }
+            addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
             putExtra(
                 DeclarationScheduler.EXTRA_REQUIRED_DECLARATION,
                 DeclarationScheduler.currentDeclarationText(context),

@@ -45,9 +45,8 @@ object QueenHonorific {
 
 
     fun displayName(context: Context): String {
-
-        return getPreset(context).defaultText
-
+        val preset = getPreset(context)
+        return context.getString(preset.labelRes)
     }
 
 
@@ -129,13 +128,9 @@ object QueenHonorific {
                 setPreset(activity, chosen)
 
                 Toast.makeText(
-
                     activity,
-
-                    activity.getString(R.string.honorific_applied_fmt, chosen.defaultText),
-
+                    activity.getString(R.string.honorific_applied_fmt, activity.getString(chosen.labelRes)),
                     Toast.LENGTH_SHORT,
-
                 ).show()
 
                 onChanged()

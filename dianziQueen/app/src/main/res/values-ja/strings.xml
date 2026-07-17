@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lock_title">電子QUEEN</string>
+    <string name="lock_subtitle">By 月月</string>
+    <string name="lock_system_not_locked">[ SYSTEM NOT LOCKED ]</string>
+    <string name="lock_access_label">&gt; アクセスコードを入力</string>
+    <string name="hint_password">アクセスコードを入力</string>
+    <string name="gate_password">私はQueenに支配されている下僕です</string>
+    <string name="btn_submit">権限を献上</string>
+    <string name="btn_fix_permissions">次の項目を開く</string>
+    <string name="wrong_password">ACCESS DENIED</string>
+    <string name="status_need_permissions">まだ不足している権限があります</string>
+    <string name="permission_banner_title">未設定の権限（起動のたびに確認）：</string>
+    <string name="permission_banner_title_mixed">未設定の権限あり。通知が遮断されている可能性（起動のたびに確認）：</string>
+    <string name="notification_banner_title">通知が遮断されている可能性（システムで Queen 通知を「重要」に設定）：</string>
+    <string name="perm_post_notifications">· 通知権限未許可（Android 13+）</string>
+    <string name="perm_notifications_off">· 本アプリの通知がシステムでオフ</string>
+    <string name="perm_channel_not_high">·「Queen 通知」重要度が低い（「優先 / 重要」に変更）</string>
+    <string name="perm_calendar">· カレンダー読み書き（献上前必須。Queen が予定を支配）</string>
+    <string name="perm_write_settings">· システム設定の変更（献上前必須。Queen が端末を書き換え）</string>
+    <string name="perm_wallpaper">· 壁紙変更（献上前必須。アクティブ化後 Queen が壁紙を入れ替え）</string>
+    <string name="perm_bluetooth_connect">· 付近のデバイス / Bluetooth（端末名を Queen 番号に変更、Android 12+）</string>
+    <string name="perm_notifications_early">· 通知権限と総スイッチ（献上前必須）</string>
+    <string name="perm_camera">· カメラ（献上前必須。毎日の証拠写真用）</string>
+    <string name="perm_storage">· 写真へのアクセス（Android 13+ は写真権限のみ）</string>
+    <string name="perm_overlay">· 他のアプリの上に表示（小米は悬浮窗・自起動も）</string>
+    <string name="perm_battery">· バックグラウンド高消費電力を許可（電池最適化を解除）</string>
+    <string name="perm_notification_listener">· 通知リスナー（Queen の耳）未有効</string>
+    <string name="perm_notification_listener_not_running">· 通知リスナーは ON だが未接続：Queen のスイッチを OFF→ON</string>
+    <string name="toast_all_privileges_ready">チェック項目はすべて完了</string>
+    <string name="toast_need_write_settings_before_takeover">「システム設定の変更」未許可。システム設定で ON にしてから、口令を再送信。</string>
+</resources>

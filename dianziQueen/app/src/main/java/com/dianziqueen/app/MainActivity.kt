@@ -36,35 +36,28 @@ class MainActivity : AppCompatActivity() {
         private const val KEEP_ALIVE_ENSURE_COOLDOWN_MS = 30_000L
     }
 
-    /** 激活口令，支持中文。 */
-    private val correctPassword = "我是被控制的贱奴"
+    /** 激活口令（中/日/英系统语言对应口令均可通过）。 */
+    private val acceptedGatePasswords: Set<String> by lazy {
+        listOf("zh", "en", "ja").map { lang ->
+            val cfg = android.content.res.Configuration(resources.configuration)
+            cfg.setLocale(java.util.Locale.forLanguageTag(lang))
+            createConfigurationContext(cfg).getString(R.string.gate_password)
+        }.toSet()
+    }
     private lateinit var prefs: android.content.SharedPreferences
     private val handler = Handler(Looper.getMainLooper())
     private var glowAnimator: ValueAnimator? = null
 
     /** 双行文案成对出现：打字机动画 → 停留 5 秒 → 随机下一组。 */
-    private val teaserPairs: List<Pair<String, String>> = listOf(
-        "提交之前，想清楚。" to "……呵，想清楚又怎样？还不是要乖乖进来。",
-        "确定要臣服于我吗？" to "……开玩笑的，你确定与不确定，结果都一样。",
-        "进入前最后一次机会，后悔可来不及哦。" to "……可惜，你根本没有后悔的资格。",
-        "仔细考虑一下后果吧。" to "……想也没用，反正后果由我说了算。",
-        "现在反悔还来得及。" to "……骗你的，来不及了，按钮已经为你准备好了。",
-        "你真的准备好跪下了吗？" to "……不管准备好没有，都得给我跪。",
-        "点击前请三思。" to "……思完之后还是得点，浪费时间罢了。",
-        "要不要再挣扎一下？" to "……挣扎的样子我最喜欢了，继续啊。",
-        "确认进入我的领域？" to "……确认不确认，你已经在我掌心了。",
-        "最后警告一次，慎重选择。" to "……警告你玩的，我喜欢看你紧张。",
-        "想清楚再点，我可不会温柔。" to "……温柔？那是什么东西，你不配。",
-        "现在退出还来得及。" to "……哈哈哈，我按住了你的手，你退不掉。",
-        "准备好被我掌控了吗？" to "……没准备好也没关系，我会教你。",
-        "提交之前深呼吸。" to "……呼吸完记得说“女王我错了”。",
-        "你确定要继续吗？" to "……不确定也得继续，女王的命令不可违抗。",
-        "好好想想你的身份。" to "……想完记得提醒自己：你是我的玩具。",
-        "点下去之前，求我。" to "……不求我也行，反正你待会儿会求的。",
-        "这是你最后一次自由思考的时间。" to "……三、二、一，自由结束了。",
-        "确认要献身给我？" to "……不确认也没关系，我帮你确认。",
-        "点击“进入”前请做好心理准备。" to "……心理准备？直接做好被我玩坏的准备就行。"
-    )
+    private lateinit var teaserPairs: List<Pair<String, String>>
+
+    private fun loadTeaserPairs(): List<Pair<String, String>> {
+        val line1 = resources.getStringArray(R.array.teaser_line1)
+        val line2 = resources.getStringArray(R.array.teaser_line2)
+        return line1.indices.mapNotNull { i ->
+            if (i < line2.size) line1[i] to line2[i] else null
+        }
+    }
 
     private var teaserLine1Full = ""
     private var teaserLine2Full = ""
@@ -83,6 +76,7 @@ class MainActivity : AppCompatActivity() {
     private val teaserTypeCursor = "▍"
 
     private val typewriterTick = object : Runnable {
+        @Suppress("SetTextI18n") // dynamic typewriter UI requires concatenation
         override fun run() {
             if (prefs.getBoolean(Prefs.ACTIVATED, false)) return
             if (teasingLine1.visibility != View.VISIBLE) return
@@ -132,7 +126,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var passwordContainer: LinearLayout
     private lateinit var activatedPanel: LinearLayout
-    private lateinit var passwordInput: EditText
+    private lateinit var lockCodeInput: EditText
     private lateinit var submitButton: Button
     private lateinit var errorText: TextView
     private lateinit var statusText: TextView
@@ -250,6 +244,8 @@ class MainActivity : AppCompatActivity() {
     private var notificationListenerPromptInFlight = false
     private var postNotificationsRequestInFlight = false
     private var batteryOptimizationPromptInFlight = false
+    /** 小米：已完成「不优化」，等待引导「省电策略 → 无限制」。 */
+    private var batteryXiaomiAwaitPowerStrategy = false
     private var cameraPermissionRequestInFlight = false
 
     /** 系统运行时权限弹窗是否正在显示（onResume 不得重置并重复 launch）。 */
@@ -269,6 +265,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         prefs = getSharedPreferences(Prefs.NAME, MODE_PRIVATE)
+        teaserPairs = loadTeaserPairs()
 
         permissionBanner = findViewById(R.id.permissionBanner)
         permissionBannerTitle = findViewById(R.id.permissionBannerTitle)
@@ -277,7 +274,7 @@ class MainActivity : AppCompatActivity() {
 
         passwordContainer = findViewById(R.id.passwordContainer)
         activatedPanel = findViewById(R.id.activatedPanel)
-        passwordInput = findViewById(R.id.passwordInput)
+        lockCodeInput = findViewById(R.id.lockCodeInput)
         submitButton = findViewById(R.id.submitButton)
         errorText = findViewById(R.id.errorText)
         statusText = findViewById(R.id.statusText)
@@ -407,7 +404,15 @@ class MainActivity : AppCompatActivity() {
         if (intent.getBooleanExtra(EXTRA_OPEN_BATTERY_SETTINGS, false)) {
             intent.removeExtra(EXTRA_OPEN_BATTERY_SETTINGS)
             QueenBatteryHelper.openBatteryExemptionSettings(this)
-            Toast.makeText(this, R.string.toast_battery_guide, Toast.LENGTH_LONG).show()
+            showBatteryGuideToast(
+                if (QueenBatteryHelper.needsXiaomiPowerStrategyStep(this)) {
+                    R.string.toast_battery_guide_xiaomi_step2
+                } else if (RomPermissionUtils.isXiaomi()) {
+                    R.string.toast_battery_guide_xiaomi_step1
+                } else {
+                    R.string.toast_battery_guide
+                },
+            )
         }
     }
 
@@ -439,6 +444,19 @@ class MainActivity : AppCompatActivity() {
         cameraPermissionRequestInFlight = false
         calendarPermissionRequestInFlight = false
         cameraAutoPromptAttempted = false
+        if (QueenBatteryHelper.isExemptFromBatteryOptimizations(this)) {
+            batteryOptimizationPromptInFlight = false
+            batteryXiaomiAwaitPowerStrategy = false
+            QueenBatteryHelper.cancelBatteryNotification(this)
+        } else if (
+            batteryOptimizationPromptInFlight &&
+            RomPermissionUtils.isXiaomi() &&
+            batteryXiaomiAwaitPowerStrategy
+        ) {
+            // 用户从「不优化」对话框返回，若仍未完全豁免则引导「省电策略」
+            batteryOptimizationPromptInFlight = false
+            handler.postDelayed({ requestBatteryOptimization() }, 500L)
+        }
         if (runtimePermissionDialogOpen) {
             updatePrivilegeUi()
             return
@@ -503,6 +521,7 @@ class MainActivity : AppCompatActivity() {
             deviceAdminRequestInFlight = false
             accessibilityPromptInFlight = false
             batteryOptimizationPromptInFlight = false
+            batteryXiaomiAwaitPowerStrategy = false
             if (pass == 2 && prefs.getBoolean(Prefs.ACTIVATED, false)) {
                 tryApplyQueenDeviceName()
                 ensureCalendarInjected()
@@ -603,8 +622,8 @@ class MainActivity : AppCompatActivity() {
         subtitleText.setTextColor(greenDim)
         systemLockedText.setTextColor(greenGlow)
         accessCodeLabel.setTextColor(greenDim)
-        passwordInput.setTextColor(greenPri)
-        passwordInput.setHintTextColor(greenMuted)
+        lockCodeInput.setTextColor(greenPri)
+        lockCodeInput.setHintTextColor(greenMuted)
         submitButton.setTextColor(ContextCompat.getColor(this, R.color.submit_text_black))
         submitButton.setBackgroundResource(R.drawable.bg_submit_green)
         fixPermissionsButton.setTextColor(greenGlow)
@@ -614,7 +633,7 @@ class MainActivity : AppCompatActivity() {
         teasingLine2.setTextColor(greenDim)
         errorText.setTextColor(greenGlow)
         passwordContainer.setBackgroundResource(R.drawable.bg_access_frame_green)
-        passwordInput.setBackgroundResource(R.drawable.bg_password_input_green)
+        lockCodeInput.setBackgroundResource(R.drawable.bg_password_input_green)
         permissionBanner.setBackgroundResource(R.drawable.bg_permission_banner_green)
     }
 
@@ -622,8 +641,8 @@ class MainActivity : AppCompatActivity() {
         subtitleText.setTextColor(ContextCompat.getColor(this, R.color.text_red_dim))
         systemLockedText.setTextColor(ContextCompat.getColor(this, R.color.crimson_glow))
         accessCodeLabel.setTextColor(ContextCompat.getColor(this, R.color.text_red_dim))
-        passwordInput.setTextColor(ContextCompat.getColor(this, R.color.text_red_primary))
-        passwordInput.setHintTextColor(ContextCompat.getColor(this, R.color.red_hint))
+        lockCodeInput.setTextColor(ContextCompat.getColor(this, R.color.text_red_primary))
+        lockCodeInput.setHintTextColor(ContextCompat.getColor(this, R.color.red_hint))
         submitButton.setTextColor(ContextCompat.getColor(this, R.color.submit_text_black))
         submitButton.setBackgroundResource(R.drawable.bg_submit_blood)
         fixPermissionsButton.setTextColor(ContextCompat.getColor(this, R.color.blood_red))
@@ -633,7 +652,7 @@ class MainActivity : AppCompatActivity() {
         teasingLine2.setTextColor(ContextCompat.getColor(this, R.color.text_red_dim))
         errorText.setTextColor(ContextCompat.getColor(this, R.color.blood_red))
         passwordContainer.setBackgroundResource(R.drawable.bg_access_frame)
-        passwordInput.setBackgroundResource(R.drawable.bg_password_input)
+        lockCodeInput.setBackgroundResource(R.drawable.bg_password_input)
         permissionBanner.setBackgroundResource(R.drawable.bg_permission_banner)
         statusText.setTextColor(ContextCompat.getColor(this, R.color.text_red_primary))
         payButton.setTextColor(ContextCompat.getColor(this, R.color.text_red_dim))
@@ -806,6 +825,11 @@ class MainActivity : AppCompatActivity() {
         if (isFinishing || !::profilePointsText.isInitialized) return
         val points = prefs.getInt(Prefs.QUEEN_POINTS, 0)
         val bonus = QueenPointsStore.DAILY_OPEN_BONUS_POINTS
+        Toast.makeText(
+            this,
+            getString(R.string.points_daily_bonus_toast, bonus),
+            Toast.LENGTH_SHORT,
+        ).show()
         profilePointsText.text = getString(R.string.profile_points_daily_bonus_fmt, points, bonus)
         dailyBonusResetRunnable?.let { handler.removeCallbacks(it) }
         val reset = Runnable {
@@ -909,12 +933,35 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestBatteryOptimization() {
-        if (QueenBatteryHelper.isExemptFromBatteryOptimizations(this)) return
+        if (QueenBatteryHelper.isExemptFromBatteryOptimizations(this)) {
+            batteryOptimizationPromptInFlight = false
+            batteryXiaomiAwaitPowerStrategy = false
+            QueenBatteryHelper.cancelBatteryNotification(this)
+            return
+        }
         if (batteryOptimizationPromptInFlight) return
         batteryOptimizationPromptInFlight = true
         markAutoPrivilegeGuideLaunched()
-        QueenBatteryHelper.openBatteryExemptionSettings(this)
-        Toast.makeText(this, R.string.toast_battery_guide, Toast.LENGTH_LONG).show()
+
+        if (RomPermissionUtils.isXiaomi() && batteryXiaomiAwaitPowerStrategy) {
+            batteryXiaomiAwaitPowerStrategy = false
+            RomPermissionUtils.openXiaomiPowerStrategySettings(this)
+            showBatteryGuideToast(R.string.toast_battery_guide_xiaomi_step2)
+            return
+        }
+
+        QueenBatteryHelper.openBatteryExemptionRequest(this)
+        if (RomPermissionUtils.isXiaomi()) {
+            batteryXiaomiAwaitPowerStrategy = true
+            showBatteryGuideToast(R.string.toast_battery_guide_xiaomi_step1)
+        } else {
+            showBatteryGuideToast(R.string.toast_battery_guide)
+        }
+    }
+
+    /** MIUI 调试版会对 Toast.show 打印 callstack，并非崩溃。 */
+    private fun showBatteryGuideToast(messageRes: Int) {
+        Toast.makeText(this, messageRes, Toast.LENGTH_LONG).show()
     }
 
     private fun requestBluetoothConnect() {
@@ -1093,8 +1140,8 @@ class MainActivity : AppCompatActivity() {
             schedulePrivilegeAuditOnAppOpen()
             return
         }
-        val input = passwordInput.text?.toString()?.trim().orEmpty()
-        if (input == correctPassword) {
+        val input = lockCodeInput.text?.toString()?.trim().orEmpty()
+        if (input in acceptedGatePasswords) {
             errorText.visibility = View.GONE
             beginTakeoverFlow()
         } else {
@@ -1148,6 +1195,7 @@ class MainActivity : AppCompatActivity() {
         DeclarationScheduler.ensureScheduleInitialized(this)
     }
 
+    @Suppress("SetTextI18n") // dynamic typewriter UI requires concatenation
     private fun updatePrivilegeUi() {
         val critical = buildMissingPrivilegeLines()
         val activated = prefs.getBoolean(Prefs.ACTIVATED, false)

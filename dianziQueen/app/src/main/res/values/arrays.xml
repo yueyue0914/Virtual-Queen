@@ -5,6 +5,6 @@
         <item>自启动管理</item>
         <item>省电策略 / 无限制（小米）</item>
         <item>厂商权限中心（华米OV）</item>
-        <item>应用详情</item>
+        <item>@string/domestic_rom_guide_app_details</item>
     </string-array>
 </resources>

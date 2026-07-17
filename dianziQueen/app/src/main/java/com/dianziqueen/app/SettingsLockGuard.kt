@@ -84,13 +84,19 @@ object SettingsLockGuard {
         return true
     }
 
-    fun isBlockedExternalWindow(context: Context, packageName: String): Boolean {
+    fun isBlockedExternalWindow(
+        context: Context,
+        packageName: String,
+        className: String = "",
+    ): Boolean {
         if (packageName.isBlank()) return false
         val self = context.packageName
         if (packageName.equals(self, ignoreCase = true)) return false
         val p = packageName.lowercase()
+        val cls = className.lowercase()
         if (isAllowedEverydayApp(p)) return false
-        return isBlockedSettingsPackage(p)
+        if (isExemptTransientSystemUi(p, cls)) return false
+        return isBlockedSettingsWindow(p, cls)
     }
 
     /** 日历、时钟、联系人等日常 App 不应被「禁止进设置」误伤。 */
@@ -104,27 +110,132 @@ object SettingsLockGuard {
         return false
     }
 
-    /** 仅拦截系统/厂商设置与权限中心，不用宽泛的 contains("settings")。 */
-    private fun isBlockedSettingsPackage(p: String): Boolean {
-        if (p == "com.android.settings" || p.startsWith("com.android.settings.")) return true
-        if (p == "com.android.permissioncontroller") return true
-        if (p.contains("packageinstaller")) return true
-        if (p == "com.xiaomi.misettings" || p.startsWith("com.miui.securitycenter")) return true
-        if (p.contains("securitycenter") && p.contains("miui")) return true
-        if (p.contains("systemmanager") && (p.contains("huawei") || p.contains("honor"))) return true
-        if (p.contains("coloros") && (p.contains("safe") || p.contains("perm") || p.contains("secure"))) {
+    /**
+     * 运行时权限弹窗、游戏加速/安全中心浮层等会短暂顶到前台，包名像「设置/权限」但不应拦截。
+     */
+    private fun isExemptTransientSystemUi(p: String, cls: String): Boolean {
+        if (isRuntimePermissionDialog(p, cls)) return true
+        if (isGameOrVendorOverlay(p, cls)) return true
+        return false
+    }
+
+    private fun isRuntimePermissionDialog(p: String, cls: String): Boolean {
+        if (!p.endsWith(".permissioncontroller")) return false
+        if (cls.isBlank()) return false
+        return cls.contains("grantpermission") ||
+            cls.contains("permissiongrant") ||
+            cls.contains("requestpermission") ||
+            cls.contains("requestpermissions")
+    }
+
+    private fun isGameOrVendorOverlay(p: String, cls: String): Boolean {
+        if (cls.isBlank()) return false
+        if (cls.contains("gamebooster") || cls.contains("gameturbo") || cls.contains("gameboost")) {
             return true
         }
-        if (p.contains("oplus") && (p.contains("safe") || p.contains("perm"))) return true
-        if (p.contains("vivo") && p.contains("permission")) return true
-        if (p.endsWith(".settings") || p.endsWith(".misettings")) return true
-        if (p.contains(".settings.") && !p.contains("calendar")) return true
-        if (p.contains("safecenter")) return true
-        if (p.contains("permissionmanager")) return true
-        if (p.contains("systemmanager")) return true
-        if (p.contains("huawei.systemmanager")) return true
-        if (p.contains("miui") && (p.contains("security") || p.contains("perm"))) return true
+        if (cls.contains("game") && (cls.contains("float") || cls.contains("overlay") || cls.contains("window"))) {
+            return true
+        }
+        if ((p.contains("securitycenter") || p.contains("safecenter")) &&
+            (cls.contains("float") || cls.contains("overlay") || cls.contains("toast") || cls.contains("game"))
+        ) {
+            return true
+        }
         return false
+    }
+
+    /** 仅拦截系统/厂商设置与权限中心；模糊包名须结合 Activity 类名，避免误伤第三方 App。 */
+    private fun isBlockedSettingsWindow(p: String, cls: String): Boolean {
+        if (p == "com.android.settings" || p.startsWith("com.android.settings.")) return true
+        if (p == "com.xiaomi.misettings" || p.startsWith("com.xiaomi.misettings.")) return true
+
+        if (p.endsWith(".permissioncontroller")) {
+            return isPermissionControllerSettings(p, cls)
+        }
+        if (p.contains("packageinstaller")) {
+            return isPackageInstallerSettings(p, cls)
+        }
+
+        if (p == "com.miui.securitycenter" || p.startsWith("com.miui.securitycenter.")) {
+            return isMiuiSecurityCenterSettings(cls)
+        }
+        if (p.contains("securitycenter") && p.contains("miui")) {
+            return isMiuiSecurityCenterSettings(cls)
+        }
+        if (p.contains("systemmanager") && (p.contains("huawei") || p.contains("honor"))) {
+            return !isGameOrVendorOverlay(p, cls)
+        }
+        if (p.contains("coloros") && (p.contains("safe") || p.contains("perm") || p.contains("secure"))) {
+            return !isGameOrVendorOverlay(p, cls)
+        }
+        if (p.contains("oplus") && (p.contains("safe") || p.contains("perm"))) {
+            return !isGameOrVendorOverlay(p, cls)
+        }
+        if (p.contains("vivo") && p.contains("permission")) {
+            return !isGameOrVendorOverlay(p, cls)
+        }
+        if (isSystemOrVendorSettingsSuffix(p)) return true
+        if (isSystemOrVendorSettingsSegment(p)) return true
+        if ((p.contains("coloros") || p.contains("oplus") || p.contains("huawei")) && p.contains("safecenter")) {
+            return !isGameOrVendorOverlay(p, cls)
+        }
+        if (p.contains("permissionmanager") &&
+            (p.contains("huawei") || p.contains("honor") || p.contains("miui") || p.contains("coloros") || p.contains("oplus"))
+        ) {
+            return !isGameOrVendorOverlay(p, cls)
+        }
+        if (p.contains("miui") && (p.contains("security") || p.contains("perm"))) {
+            return !isGameOrVendorOverlay(p, cls)
+        }
+        return false
+    }
+
+    private fun isPermissionControllerSettings(p: String, cls: String): Boolean {
+        if (isRuntimePermissionDialog(p, cls)) return false
+        if (cls.isBlank()) return false
+        return cls.contains("settings") ||
+            cls.contains("manage") ||
+            cls.contains("apppermission") ||
+            cls.contains("permissionapps") ||
+            cls.contains("reviewpermission") ||
+            cls.contains("advancedpermission") ||
+            cls.contains("permissiontab")
+    }
+
+    private fun isPackageInstallerSettings(p: String, cls: String): Boolean {
+        if (cls.isBlank()) return true
+        if (cls.contains("install") && !cls.contains("uninstall") && !cls.contains("appinfo")) return false
+        return true
+    }
+
+    private fun isMiuiSecurityCenterSettings(cls: String): Boolean {
+        if (isGameOrVendorOverlay("", cls)) return false
+        if (cls.isBlank()) return false
+        return true
+    }
+
+    private fun isSystemOrVendorSettingsSuffix(p: String): Boolean {
+        if (!p.endsWith(".settings") && !p.endsWith(".misettings")) return false
+        return p.startsWith("com.android.") ||
+            p.contains("miui") ||
+            p.contains("huawei") ||
+            p.contains("honor") ||
+            p.contains("coloros") ||
+            p.contains("oplus") ||
+            p.contains("vivo") ||
+            p.contains("samsung")
+    }
+
+    private fun isSystemOrVendorSettingsSegment(p: String): Boolean {
+        if (!p.contains(".settings.") || p.contains("calendar")) return false
+        return p.startsWith("com.android.") ||
+            p.contains("miui") ||
+            p.contains("huawei") ||
+            p.contains("honor") ||
+            p.contains("coloros") ||
+            p.contains("oplus") ||
+            p.contains("vivo") ||
+            p.contains("samsung")
     }
 
     /**

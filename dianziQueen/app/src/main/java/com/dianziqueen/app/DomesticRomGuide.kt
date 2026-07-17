@@ -225,15 +225,28 @@ object DomesticRomGuide {
             if (!RomPermissionProbe.isWriteSettingsAutoDetected(context)) {
                 lines.add(context.getString(R.string.domestic_rom_status_write_settings))
             }
-            lines.add(
-                if (detectRom() == RomVendor.XIAOMI) {
-                    context.getString(R.string.domestic_rom_status_xiaomi_autostart)
-                } else {
-                    context.getString(R.string.domestic_rom_status_autostart_hint)
-                },
-            )
+            if (!isConfirmed(context, "autostart")) {
+                lines.add(
+                    if (detectRom() == RomVendor.XIAOMI) {
+                        context.getString(R.string.domestic_rom_status_xiaomi_autostart)
+                    } else {
+                        context.getString(R.string.domestic_rom_status_autostart_hint)
+                    },
+                )
+            }
+            if (!isConfirmed(context, "lock_app")) {
+                lines.add(context.getString(R.string.perm_check_item_lock_app))
+            }
+            if (!isConfirmed(context, "rom_extra")) {
+                lines.add(context.getString(R.string.perm_check_item_rom_extra))
+            }
         }
         return lines
+    }
+
+    private fun isConfirmed(context: Context, id: String): Boolean {
+        val key = RomPermissionProbe.confirmKeyForPermissionId(id) ?: return false
+        return RomPermissionProbe.isUserConfirmed(context, key)
     }
 
     private fun clearPending(context: Context) {

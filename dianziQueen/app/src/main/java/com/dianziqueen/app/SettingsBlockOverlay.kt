@@ -2,15 +2,16 @@ package com.dianziqueen.app
 
 import android.content.Context
 import android.graphics.PixelFormat
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import java.lang.ref.WeakReference
 import kotlin.random.Random
 
 /**
@@ -21,17 +22,21 @@ object SettingsBlockOverlay {
     private const val TAG = "SettingsBlockOverlay"
 
     private val handler = Handler(Looper.getMainLooper())
-    private var rootView: View? = null
+    private var rootViewRef = WeakReference<View>(null)
     private var windowManager: WindowManager? = null
     private var isShowing = false
     private var vibrating = false
 
+    private val rootView: View? get() = rootViewRef.get()
+
     private val threats: Array<String>
-        get() = rootView?.context?.resources
-            ?.getStringArray(R.array.uninstall_threat_lines)
-            ?.map { QueenHonorific.apply(rootView!!.context, it) }
-            ?.toTypedArray()
-            ?: emptyArray()
+        get() {
+            val ctx = rootView?.context ?: return emptyArray()
+            return ctx.resources
+                .getStringArray(R.array.uninstall_threat_lines)
+                .map { QueenHonorific.apply(ctx, it) }
+                .toTypedArray()
+        }
 
     private val vibrateRunnable = object : Runnable {
         override fun run() {
@@ -67,7 +72,9 @@ object SettingsBlockOverlay {
         hide()
         return try {
             val wm = ContextCompat.getSystemService(app, WindowManager::class.java) ?: return false
-            val root = LayoutInflater.from(app).inflate(R.layout.activity_uninstall_threat, null)
+            val inflateParent = FrameLayout(app)
+            val root = LayoutInflater.from(app)
+                .inflate(R.layout.activity_uninstall_threat, inflateParent, false)
             root.findViewById<TextView>(R.id.tvUninstallThreatTitle).text = title
             root.findViewById<TextView>(R.id.tvUninstallThreatBody).text = body
             root.findViewById<Button>(R.id.btnUninstallSurrender).apply {
@@ -75,12 +82,7 @@ object SettingsBlockOverlay {
                 setOnClickListener { hide() }
             }
 
-            val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                @Suppress("DEPRECATION")
-                WindowManager.LayoutParams.TYPE_PHONE
-            }
+            val type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             val params = WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT,
@@ -91,7 +93,7 @@ object SettingsBlockOverlay {
                 PixelFormat.TRANSLUCENT,
             )
             wm.addView(root, params)
-            rootView = root
+            rootViewRef = WeakReference(root)
             windowManager = wm
             isShowing = true
             vibrating = true
@@ -121,7 +123,7 @@ object SettingsBlockOverlay {
                 wm.removeView(view)
             }
         } catch (_: Exception) { }
-        rootView = null
+        rootViewRef = WeakReference(null)
         windowManager = null
         isShowing = false
     }

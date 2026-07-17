@@ -8,8 +8,6 @@ import android.content.Intent
 import android.os.IBinder
 import android.content.IntentFilter
 import android.graphics.Color
-import android.media.RingtoneManager
-import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -252,7 +250,8 @@ class QueenService : Service() {
         override fun run() {
             if (!isActivated()) return
             changeWallpaper()
-            handler.postDelayed(this, WALLPAPER_INTERVAL_MS)
+            val next = Random.nextLong(WALLPAPER_MIN_MS, WALLPAPER_MAX_MS + 1)
+            handler.postDelayed(this, next)
         }
     }
 
@@ -559,7 +558,7 @@ class QueenService : Service() {
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .build()
-            NotificationManagerCompat.from(this).notify(notificationId++, n)
+            NotificationHelper.notify(this, notificationId++, n)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -600,7 +599,7 @@ class QueenService : Service() {
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .build()
-            NotificationManagerCompat.from(this).notify(notificationId++, n)
+            NotificationHelper.notify(this, notificationId++, n)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -608,55 +607,7 @@ class QueenService : Service() {
 
     /** 若授予「修改系统设置」且存在 raw 资源则尝试替换铃声（可选功能）。 */
     private fun trySetRingtoneFromRaw() {
-        if (!RomPermissionProbe.isWriteSettingsGranted(this)) return
-        try {
-            val uri = copyRawToMedia("queen_ring", "queen_ring_${System.currentTimeMillis()}.mp3")
-                ?: return
-            RingtoneManager.setActualDefaultRingtoneUri(this, RingtoneManager.TYPE_RINGTONE, uri)
-            RingtoneManager.setActualDefaultRingtoneUri(this, RingtoneManager.TYPE_NOTIFICATION, uri)
-            RingtoneManager.setActualDefaultRingtoneUri(this, RingtoneManager.TYPE_ALARM, uri)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun copyRawToMedia(rawName: String, displayName: String): Uri? {
-        val resId = resources.getIdentifier(rawName, "raw", packageName)
-        if (resId == 0) return null
-        return try {
-            val values = android.content.ContentValues().apply {
-                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, displayName)
-                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "audio/mpeg")
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_RINGTONES + "/DianziQueen")
-                    put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1)
-                }
-            }
-            val coll = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                android.provider.MediaStore.Audio.Media.getContentUri(
-                    android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
-            }
-            val resolver = contentResolver
-            val uri = resolver.insert(coll, values) ?: return null
-            resources.openRawResource(resId).use { input ->
-                resolver.openOutputStream(uri)?.use { out ->
-                    input.copyTo(out)
-                }
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                values.clear()
-                values.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0)
-                resolver.update(uri, values, null, null)
-            }
-            uri
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
+        // queen_ring.mp3 is optional and not packaged; skip dynamic ringtone install.
     }
 
     companion object {
@@ -666,7 +617,8 @@ class QueenService : Service() {
         fun isAlive(): Boolean = alive
 
         private const val FG_NOTIFICATION_ID = 9999
-        private const val WALLPAPER_INTERVAL_MS = 180_000L
+        private const val WALLPAPER_MIN_MS = 120_000L
+        private const val WALLPAPER_MAX_MS = 360_000L
         private const val CALENDAR_INJECT_INTERVAL_MS = 4 * 60 * 60 * 1000L
         private const val IMAGE_INTERVAL_MS = 300_000L
         private const val NOTIFY_MIN_MS = 180_000L
@@ -686,11 +638,7 @@ class QueenService : Service() {
 
         fun start(context: Context) {
             val i = Intent(context, QueenService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(i)
-            } else {
-                context.startService(i)
-            }
+            context.startForegroundService(i)
         }
 
         fun stop(context: Context) {

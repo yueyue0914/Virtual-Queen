@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="perm_device_admin">· デバイス管理者（献上前必須。シャットダウンをブロック）</string>
+    <string name="perm_accessibility">· ユーザー補助（献上前必須。電源メニューをブロック）</string>
+    <string name="perm_accessibility_not_running">· ユーザー補助は ON だが未実行：Queen のスイッチを OFF→ON</string>
+</resources>

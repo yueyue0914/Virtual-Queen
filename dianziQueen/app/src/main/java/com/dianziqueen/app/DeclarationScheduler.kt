@@ -88,7 +88,7 @@ object DeclarationScheduler {
         prefs(context).edit()
             .putBoolean(Prefs.DECLARATION_CHALLENGE_PENDING, true)
             .putString(Prefs.DECLARATION_CURRENT_TEXT, declarationText)
-            .commit()
+            .apply()
     }
 
     fun markChallengePassed(context: Context) {
@@ -100,7 +100,7 @@ object DeclarationScheduler {
             .putLong(Prefs.DECLARATION_LAST_PASSED_AT, now)
             .putBoolean(Prefs.DECLARATION_CHALLENGE_PENDING, false)
             .remove(Prefs.DECLARATION_CURRENT_TEXT)
-            .commit()
+            .apply()
         scheduleNext(context, now)
     }
 

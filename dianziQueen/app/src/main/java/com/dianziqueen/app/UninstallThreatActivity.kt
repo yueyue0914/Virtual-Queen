@@ -2,13 +2,13 @@ package com.dianziqueen.app
 
 import android.graphics.Color
 import android.graphics.PixelFormat
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
@@ -67,6 +67,7 @@ class UninstallThreatActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnUninstallSurrender).text = hon(R.string.uninstall_threat_surrender)
         findViewById<Button>(R.id.btnUninstallSurrender).setOnClickListener {
             vibrating = false
+            Toast.makeText(this, hon(R.string.uninstall_guard_continue_toast), Toast.LENGTH_LONG).show()
             finish()
         }
 
@@ -74,7 +75,12 @@ class UninstallThreatActivity : AppCompatActivity() {
         handler.post(rotateRunnable)
 
         val autoFinish = intent.getLongExtra(EXTRA_AUTO_FINISH_MS, 9_000L).coerceAtLeast(3_000L)
-        handler.postDelayed({ if (!isFinishing) finish() }, autoFinish)
+        handler.postDelayed({
+            if (!isFinishing) {
+                Toast.makeText(this, hon(R.string.uninstall_guard_continue_toast), Toast.LENGTH_LONG).show()
+                finish()
+            }
+        }, autoFinish)
     }
 
     override fun onDestroy() {
@@ -88,9 +94,7 @@ class UninstallThreatActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.statusBarColor = Color.BLACK
         window.navigationBarColor = Color.BLACK
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-        }
+        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         WindowInsetsControllerCompat(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.statusBars())
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE

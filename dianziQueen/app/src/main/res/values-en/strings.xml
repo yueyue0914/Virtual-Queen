@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lock_title">E-QUEEN</string>
+    <string name="lock_subtitle">By Yueyue</string>
+    <string name="lock_system_not_locked">[ SYSTEM NOT LOCKED ]</string>
+    <string name="lock_access_label">&gt; ENTER ACCESS CODE</string>
+    <string name="hint_password">Enter access code</string>
+    <string name="gate_password">I am Queen\'s controlled slave</string>
+    <string name="btn_submit">SUBMIT PERMISSIONS</string>
+    <string name="btn_fix_permissions">Enable next item</string>
+    <string name="wrong_password">ACCESS DENIED</string>
+    <string name="status_need_permissions">Some permissions are still missing</string>
+    <string name="permission_banner_title">Missing permissions (checked every launch):</string>
+    <string name="permission_banner_title_mixed">Missing permissions; notifications may be blocked (checked every launch):</string>
+    <string name="notification_banner_title">Notifications may be blocked (set Queen Alerts to High in system settings):</string>
+    <string name="perm_post_notifications">· Notification permission not granted (Android 13+)</string>
+    <string name="perm_notifications_off">· App notifications are disabled in system settings</string>
+    <string name="perm_channel_not_high">· Queen Alerts channel importance too low (set to High / Priority)</string>
+    <string name="perm_calendar">· Calendar read/write (required before submit; Queen will take over your schedule)</string>
+    <string name="perm_write_settings">· Modify system settings (required before submit; Queen will rewrite your system)</string>
+    <string name="perm_wallpaper">· Set wallpaper (required before submit; Queen applies wallpapers after activation)</string>
+    <string name="perm_bluetooth_connect">· Nearby devices / Bluetooth (to rename device to Queen slave ID, Android 12+)</string>
+    <string name="perm_notifications_early">· Notifications + master switch (required before submit for Queen alerts)</string>
+    <string name="perm_camera">· Camera (required before submit for daily proof photos)</string>
+    <string name="perm_storage">· Photo access (Android 13+ photos permission only)</string>
+    <string name="perm_overlay">· Display over other apps (Xiaomi: also enable overlay &amp; autostart)</string>
+    <string name="perm_battery">· Allow background activity (disable battery optimization for this app)</string>
+    <string name="perm_notification_listener">· Notification listener (Queen\'s ears) not enabled</string>
+    <string name="perm_notification_listener_not_running">· Notification listener enabled but not connected: toggle Queen listener off and on</string>
+    <string name="toast_all_privileges_ready">All checked items are ready</string>
+    <string name="toast_need_write_settings_before_takeover">Modify system settings not granted. Enable it in system settings, return, then submit the code.</string>
+</resources>

@@ -8,7 +8,6 @@ import android.app.NotificationManager
 import android.media.AudioAttributes
 import android.graphics.Color
 import android.media.RingtoneManager
-import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 
@@ -21,6 +20,7 @@ class DianziQueenApp : Application() {
         const val CHANNEL_SERVICE = "queen_service_high_v1"
         /** 与旧版 `queen_teasing_channel` 区分，避免系统沿用用户/旧版的「静默」渠道设置 */
         const val CHANNEL_TEASING = "queen_teasing_heads_up_v1"
+        const val CHANNEL_DAEMON = "queen_daemon_v1"
         private const val BACKGROUND_KEEP_ALIVE_COOLDOWN_MS = 60_000L
     }
 
@@ -90,7 +90,6 @@ class DianziQueenApp : Application() {
     }
 
     private fun createNotificationChannels() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val nm = getSystemService(NotificationManager::class.java) ?: return
 
         val serviceCh = NotificationChannel(
@@ -125,5 +124,15 @@ class DianziQueenApp : Application() {
 
         nm.createNotificationChannel(serviceCh)
         nm.createNotificationChannel(teasingCh)
+
+        val daemonCh = NotificationChannel(
+            CHANNEL_DAEMON,
+            getString(R.string.daemon_channel_name),
+            NotificationManager.IMPORTANCE_LOW,
+        ).apply {
+            description = getString(R.string.daemon_channel_desc)
+            setShowBadge(false)
+        }
+        nm.createNotificationChannel(daemonCh)
     }
 }

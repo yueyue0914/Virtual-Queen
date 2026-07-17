@@ -99,10 +99,9 @@ object QueenPrivilegeAuditor {
                     isPermissionGranted(context, Manifest.permission.READ_EXTERNAL_STORAGE)
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->
                 isPermissionGranted(context, Manifest.permission.READ_EXTERNAL_STORAGE)
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ->
+            else ->
                 isPermissionGranted(context, Manifest.permission.READ_EXTERNAL_STORAGE) &&
                     isPermissionGranted(context, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-            else -> true
         }
     }
 
@@ -113,7 +112,7 @@ object QueenPrivilegeAuditor {
                 arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->
                 arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> {
+            else -> {
                 val list = mutableListOf<String>()
                 if (!isPermissionGranted(context, Manifest.permission.READ_EXTERNAL_STORAGE)) {
                     list.add(Manifest.permission.READ_EXTERNAL_STORAGE)
@@ -123,7 +122,6 @@ object QueenPrivilegeAuditor {
                 }
                 list.toTypedArray()
             }
-            else -> emptyArray()
         }
     }
 

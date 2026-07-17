@@ -4,7 +4,6 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.util.Log
 
 object QueenDeviceAdminHelper {
@@ -83,7 +82,6 @@ object QueenDeviceAdminHelper {
         if (!hasOwnerDpmCapability(context)) return
         if (DeclarationInterceptor.isChallengePassed() && disable) return
         if (!isAdminActive(context)) return
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
 
         val dpm = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as? DevicePolicyManager
             ?: return

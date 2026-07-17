@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="teaser_line1">
+        <item>提交之前，想清楚。</item>
+        <item>确定要臣服于我吗？</item>
+        <item>进入前最后一次机会，后悔可来不及哦。</item>
+        <item>仔细考虑一下后果吧。</item>
+        <item>现在反悔还来得及。</item>
+        <item>你真的准备好跪下了吗？</item>
+        <item>点击前请三思。</item>
+        <item>要不要再挣扎一下？</item>
+        <item>确认进入我的领域？</item>
+        <item>最后警告一次，慎重选择。</item>
+        <item>想清楚再点，我可不会温柔。</item>
+        <item>现在退出还来得及。</item>
+        <item>准备好被我掌控了吗？</item>
+        <item>提交之前深呼吸。</item>
+        <item>你确定要继续吗？</item>
+        <item>好好想想你的身份。</item>
+        <item>点下去之前，求我。</item>
+        <item>这是你最后一次自由思考的时间。</item>
+        <item>确认要献身给我？</item>
+        <item>点击“进入”前请做好心理准备。</item>
+    </string-array>
+    <string-array name="teaser_line2">
+        <item>……呵，想清楚又怎样？还不是要乖乖进来。</item>
+        <item>……开玩笑的，你确定与不确定，结果都一样。</item>
+        <item>……可惜，你根本没有后悔的资格。</item>
+        <item>……想也没用，反正后果由我说了算。</item>
+        <item>……骗你的，来不及了，按钮已经为你准备好了。</item>
+        <item>……不管准备好没有，都得给我跪。</item>
+        <item>……思完之后还是得点，浪费时间罢了。</item>
+        <item>……挣扎的样子我最喜欢了，继续啊。</item>
+        <item>……确认不确认，你已经在我掌心了。</item>
+        <item>……警告你玩的，我喜欢看你紧张。</item>
+        <item>……温柔？那是什么东西，你不配。</item>
+        <item>……哈哈哈，我按住了你的手，你退不掉。</item>
+        <item>……没准备好也没关系，我会教你。</item>
+        <item>……呼吸完记得说“女王我错了”。</item>
+        <item>……不确定也得继续，女王的命令不可违抗。</item>
+        <item>……想完记得提醒自己：你是我的玩具。</item>
+        <item>……不求我也行，反正你待会儿会求的。</item>
+        <item>……三、二、一，自由结束了。</item>
+        <item>……不确认也没关系，我帮你确认。</item>
+        <item>……心理准备？直接做好被我玩坏的准备就行。</item>
+    </string-array>
+</resources>

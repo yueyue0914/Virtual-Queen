@@ -38,6 +38,7 @@ object RomPermissionUtils {
             isXiaomi() -> Intent("miui.intent.action.OP_AUTO_START").apply {
                 addCategory(Intent.CATEGORY_DEFAULT)
                 putExtra("extra_pkgname", pkg)
+                putExtra("packageName", pkg)
             }
             isHuawei() -> Intent().apply {
                 component = ComponentName(
@@ -223,4 +224,48 @@ object RomPermissionUtils {
     }
 
     fun isDomesticRom(): Boolean = isXiaomi() || isHuawei() || isOppo() || isVivo()
+
+    /** 小米/红米：应用详情 → 省电策略 → 无限制。 */
+    fun openXiaomiPowerStrategySettings(context: Context): Boolean {
+        if (!isXiaomi()) return false
+        val pkg = context.packageName
+        return launchFirstResolved(
+            context,
+            listOf(
+                Intent().apply {
+                    component = ComponentName(
+                        "com.miui.powerkeeper",
+                        "com.miui.powerkeeper.ui.HiddenAppsConfigActivity",
+                    )
+                    putExtra("package_name", pkg)
+                    putExtra("pkg_name", pkg)
+                    putExtra("extra_pkgname", pkg)
+                    putExtra("packageName", pkg)
+                },
+                Intent().apply {
+                    component = ComponentName(
+                        "com.miui.powerkeeper",
+                        "com.miui.powerkeeper.ui.PowerSettings",
+                    )
+                    putExtra("package_name", pkg)
+                    putExtra("pkg_name", pkg)
+                    putExtra("extra_pkgname", pkg)
+                    putExtra("packageName", pkg)
+                },
+                Intent("miui.intent.action.POWER_HIDE_MODE_APP_LIST").apply {
+                    putExtra("extra_pkgname", pkg)
+                    putExtra("packageName", pkg)
+                },
+                Intent().apply {
+                    component = ComponentName(
+                        "com.miui.securitycenter",
+                        "com.miui.permcenter.permissions.PermissionsEditorActivity",
+                    )
+                    putExtra("extra_pkgname", pkg)
+                    putExtra("packageName", pkg)
+                },
+                appDetailsIntent(context),
+            ),
+        )
+    }
 }

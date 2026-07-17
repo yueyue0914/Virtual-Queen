@@ -1,6 +1,7 @@
 package com.dianziqueen.app
 
 import android.app.Activity
+import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
@@ -20,8 +21,21 @@ object NotificationHelper {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
         return ContextCompat.checkSelfPermission(
             context,
-            android.Manifest.permission.POST_NOTIFICATIONS
+            android.Manifest.permission.POST_NOTIFICATIONS,
         ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    fun notify(context: Context, id: Int, notification: Notification) {
+        if (!isPostNotificationsGranted(context)) return
+        try {
+            NotificationManagerCompat.from(context).notify(id, notification)
+        } catch (_: SecurityException) { }
+    }
+
+    fun cancel(context: Context, id: Int) {
+        try {
+            NotificationManagerCompat.from(context).cancel(id)
+        } catch (_: SecurityException) { }
     }
 
     fun areAppNotificationsEnabled(context: Context): Boolean =
@@ -41,7 +55,6 @@ object NotificationHelper {
      * 渠道尚未创建时视为通过，避免误报。
      */
     fun isTeasingChannelImportanceAdequate(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
         val nm = context.getSystemService(NotificationManager::class.java) ?: return true
         val ch = nm.getNotificationChannel(DianziQueenApp.CHANNEL_TEASING) ?: return true
         return ch.importance >= NotificationManager.IMPORTANCE_HIGH
@@ -49,14 +62,8 @@ object NotificationHelper {
 
     fun openAppNotificationSettings(activity: Activity) {
         try {
-            val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                    putExtra(Settings.EXTRA_APP_PACKAGE, activity.packageName)
-                }
-            } else {
-                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.parse("package:${activity.packageName}")
-                }
+            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, activity.packageName)
             }
             activity.startActivity(intent)
         } catch (_: Exception) { }
@@ -64,10 +71,6 @@ object NotificationHelper {
 
     /** 直达「Queen 提示」渠道设置（可改重要性）；失败则打开应用通知总页。 */
     fun openTeasingChannelSettings(activity: Activity) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            openAppNotificationSettings(activity)
-            return
-        }
         try {
             activity.startActivity(
                 Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {

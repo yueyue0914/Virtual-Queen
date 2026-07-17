@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="perm_device_admin">· Device admin (required before submit; blocks shutdown)</string>
+    <string name="perm_accessibility">· Accessibility (required before submit; blocks power menu)</string>
+    <string name="perm_accessibility_not_running">· Accessibility enabled but not running: toggle Queen accessibility off and on</string>
+</resources>

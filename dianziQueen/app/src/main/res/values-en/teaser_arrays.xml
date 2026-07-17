@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="teaser_line1">
+        <item>Think carefully before you submit.</item>
+        <item>Are you sure you want to submit to me?</item>
+        <item>Last chance before you enter. No take-backs.</item>
+        <item>Consider the consequences.</item>
+        <item>You can still back out. For now.</item>
+        <item>Ready to kneel?</item>
+        <item>Think twice before you tap.</item>
+        <item>Want to struggle a little more?</item>
+        <item>Confirm entry into my domain?</item>
+        <item>Final warning. Choose wisely.</item>
+        <item>Think before you tap. I won\'t be gentle.</item>
+        <item>You can still leave. Supposedly.</item>
+        <item>Ready to be controlled?</item>
+        <item>Take a deep breath before you submit.</item>
+        <item>Are you sure you want to continue?</item>
+        <item>Remember what you are.</item>
+        <item>Beg me before you tap.</item>
+        <item>Your last moment of free thought.</item>
+        <item>Confirm you\'re offering yourself to me?</item>
+        <item>Prepare yourself before you enter.</item>
+    </string-array>
+    <string-array name="teaser_line2">
+        <item>…Heh. Think all you want—you\'re still coming in.</item>
+        <item>…Just kidding. Yes or no, the result is the same.</item>
+        <item>…Too bad. You don\'t get to regret this.</item>
+        <item>…Doesn\'t matter. I decide the consequences.</item>
+        <item>…Kidding. Too late—the button is waiting for you.</item>
+        <item>…Ready or not, you kneel.</item>
+        <item>…You\'ll tap anyway. What a waste of time.</item>
+        <item>…I love watching you squirm. Keep going.</item>
+        <item>…Confirmed or not, you\'re already in my palm.</item>
+        <item>…The warning was for fun. I like you nervous.</item>
+        <item>…Gentle? You don\'t deserve that word.</item>
+        <item>…Ha. I\'m holding your hand. You\'re not leaving.</item>
+        <item>…Not ready? I\'ll teach you.</item>
+        <item>…After that breath, say \"Queen, I was wrong.\"</item>
+        <item>…Uncertain or not—Queen\'s order stands.</item>
+        <item>…Remember: you\'re my toy.</item>
+        <item>…Don\'t beg if you want. You will later.</item>
+        <item>…Three, two, one. Freedom over.</item>
+        <item>…Don\'t confirm? I\'ll confirm for you.</item>
+        <item>…Mental prep? Just prepare to be broken in.</item>
+    </string-array>
+</resources>
