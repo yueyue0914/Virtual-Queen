@@ -5,7 +5,7 @@
     <string name="lock_system_not_locked">[ SYSTEM NOT LOCKED ]</string>
     <string name="lock_access_label">&gt; アクセスコードを入力</string>
     <string name="hint_password">アクセスコードを入力</string>
-    <string name="gate_password">私はQueenに支配されている下僕です</string>
+    <string name="gate_password">私は電子女王の奴隷</string>
     <string name="btn_submit">権限を献上</string>
     <string name="btn_fix_permissions">次の項目を開く</string>
     <string name="wrong_password">ACCESS DENIED</string>

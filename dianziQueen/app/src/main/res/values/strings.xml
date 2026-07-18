@@ -14,7 +14,7 @@
     <string name="lock_system_online">[ SYSTEM ONLINE ]</string>
     <string name="lock_access_label">&gt; ENTER ACCESS CODE</string>
     <string name="hint_password">输入访问口令</string>
-    <string name="gate_password">我是被控制的贱奴</string>
+    <string name="gate_password">我是电子女王的贱奴</string>
     <string name="btn_submit">上交权限</string>
     <string name="btn_fix_permissions">去开启下一项</string>
     <string name="btn_support">懒得弄口令？那就去付钱。</string>

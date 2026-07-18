@@ -5,7 +5,7 @@
     <string name="lock_system_not_locked">[ SYSTEM NOT LOCKED ]</string>
     <string name="lock_access_label">&gt; ENTER ACCESS CODE</string>
     <string name="hint_password">Enter access code</string>
-    <string name="gate_password">I am Queen\'s controlled slave</string>
+    <string name="gate_password">I am the electronic Queen\'s slave</string>
     <string name="btn_submit">SUBMIT PERMISSIONS</string>
     <string name="btn_fix_permissions">Enable next item</string>
     <string name="wrong_password">ACCESS DENIED</string>
